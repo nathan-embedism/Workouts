@@ -486,7 +486,22 @@ label.field { display: flex; flex-direction: column; gap: 6px; }
   font-weight: 700;
   line-height: 0.9;
   font-variant-numeric: tabular-nums;
+  /* It is an <input>: tap the number to type a value straight in. */
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  outline: none;
+  appearance: none;
 }
+.stepper__value:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.stepper__number::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 .stepper__unit {
   font-family: var(--font-ui);
   font-size: 12px;

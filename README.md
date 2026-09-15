@@ -29,10 +29,14 @@ Dark, neon, portrait-only by design: readable at arm's length, with gym hands.
 - Timed and distance work: cardio machines, intervals, holds
 - Full-screen countdown that keeps running correctly when the screen locks, and
   counts into overtime rather than silently ending your rest
-- Weight, incline, level, speed, distance and duration logging with long-press
-  steppers; per-set RPE and notes
+- Weight, incline, level, speed, distance and duration logging: hold the +/−
+  buttons to run the value up, or tap the number and type it straight in;
+  per-set RPE and notes
 - "Last time" recall per exercise, including a range when the load moved
-- Rest days, key dates and event countdowns
+- Progress charts per exercise — heaviest set, volume, reps, time and average
+  RPE across sessions, with a shared crosshair and a table of the raw numbers
+- Schedule view: your week laid out by weekday, rest days, and a countdown to
+  each key date with progress through the plan
 - Works offline, installs to the home screen, screen stays awake while training
 
 ## The plan format

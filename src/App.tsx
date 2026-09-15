@@ -8,6 +8,7 @@ import DayPreview from './screens/DayPreview'
 import Runner from './screens/Runner'
 import History from './screens/History'
 import DataScreen from './screens/Data'
+import Schedule from './screens/Schedule'
 
 const TABS = [
   { to: '/', icon: '⚡', label: 'Today' },
@@ -40,6 +41,7 @@ export default function App() {
     case '/import': screen = <ImportPlan navigate={navigate} />; break
     case '/history': screen = <History navigate={navigate} />; break
     case '/data': screen = <DataScreen navigate={navigate} />; break
+    case '/schedule': screen = <Schedule navigate={navigate} />; break
     case '/day': screen = <DayPreview dayId={params.get('d') ?? ''} navigate={navigate} />; break
     default: screen = <Home navigate={navigate} />
   }

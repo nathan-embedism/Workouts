@@ -142,7 +142,21 @@ export function Stepper({
 
   useEffect(() => stop, [stop])
 
-  const shown = Number.isInteger(value) ? String(value) : value.toFixed(decimals)
+  // While the field is being typed in, `draft` holds the raw text so partial
+  // entries like "6." survive a re-render; null means "show the real value".
+  const [draft, setDraft] = useState<string | null>(null)
+  // Trim trailing zeros: 47.5 rather than 47.50, 60 rather than 60.00.
+  const shown = draft ?? String(Number(value.toFixed(decimals)))
+
+  const commit = () => {
+    if (draft === null) return
+    const parsed = Number(draft.replace(',', '.'))
+    setDraft(null)
+    if (draft.trim() === '' || !Number.isFinite(parsed)) return
+    const clamped = Math.min(max ?? Number.MAX_SAFE_INTEGER, Math.max(min, Math.round(parsed * 1000) / 1000))
+    valueRef.current = clamped
+    onChange(clamped)
+  }
 
   return (
     <div className="stepper">
@@ -151,7 +165,19 @@ export function Stepper({
         onPointerDown={() => start(-step)} onPointerUp={stop} onPointerLeave={stop} onPointerCancel={stop}
       >−</button>
       <div className="stepper__value">
-        <span className="stepper__number">{shown}</span>
+        <input
+          className="stepper__number"
+          // "decimal" rather than "numeric" so phones show a keypad with a point.
+          inputMode="decimal"
+          type="text"
+          enterKeyHint="done"
+          aria-label={ariaLabel}
+          value={shown}
+          onFocus={(e) => { setDraft(shown); e.currentTarget.select() }}
+          onChange={(e) => setDraft(e.target.value.replace(/[^0-9.,-]/g, ''))}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        />
         <span className="stepper__unit">{unit}</span>
       </div>
       <button
