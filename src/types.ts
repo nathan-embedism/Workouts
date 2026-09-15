@@ -46,6 +46,11 @@ export interface DropSet {
 
 export interface WorkoutSet {
   type: SetType
+  /**
+   * Input only: "do this set N times". Expanded into N sets at import, so
+   * nothing downstream ever sees it. Lets a plan say one thing instead of four.
+   */
+  repeat?: number
   reps?: number
   /** Inclusive [min, max] when the plan prescribes a range rather than a number. */
   repRange?: [number, number]
@@ -66,6 +71,8 @@ export interface WorkoutSet {
 
 export interface Exercise {
   id: string
+  /** Input only: pull the rest of this exercise from the plan's `exercises` library. */
+  ref?: string
   name: string
   modality: Modality
   equipment?: string
@@ -108,11 +115,28 @@ export interface PlanEvent {
   notes?: string
 }
 
+/** Input only: values every set or exercise inherits unless it says otherwise. */
+export interface PlanDefaults {
+  restSeconds?: number
+  restAfterBlockSeconds?: number
+  modality?: Modality
+  setType?: SetType
+  tempo?: string
+  trackingFields?: TrackingField[]
+}
+
 export interface WorkoutPlan {
   schemaVersion: 1
   planName: string
   goal?: string
   units: Units
+  /** Input only: inherited by anything that omits the field. */
+  defaults?: PlanDefaults
+  /**
+   * Input only: reusable exercise definitions keyed by a short id, so an
+   * exercise used on four days is described once and referenced by `ref`.
+   */
+  exercises?: Record<string, Partial<Exercise>>
   durationWeeks?: number
   daysPerWeek?: number
   notes?: string

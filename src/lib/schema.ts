@@ -7,24 +7,43 @@
 export const SCHEMA_SPEC = `OUTPUT FORMAT (required)
 
 Return ONE JSON object and nothing else — no prose before or after, no markdown
-code fence. It must match this shape exactly. Fields marked "optional" may be
-omitted, but never invent extra top-level keys.
+code fence. Numbers are numbers, not strings. No trailing commas, no comments.
 
 {
   "schemaVersion": 1,
   "planName": "string — short name for the plan",
-  "goal": "string, optional — one line on what the plan is for",
+  "goal": "string, optional",
   "units": "kg" | "lb",
-  "durationWeeks": 8,            // optional, whole number
-  "daysPerWeek": 4,              // optional, whole number
-  "notes": "string, optional — progression rules, how to warm up, when to deload",
+  "durationWeeks": 8,            // optional
+  "daysPerWeek": 4,              // optional
+  "notes": "string, optional — progression rules, warm-up policy, deloads",
+
+  "defaults": {                  // optional, see SHORT FORM below
+    "restSeconds": 90,
+    "restAfterBlockSeconds": 120,
+    "modality": "weights",
+    "setType": "working",
+    "trackingFields": ["weight", "reps"]
+  },
+
+  "exercises": {                 // optional library, see SHORT FORM below
+    "bench": {
+      "name": "Barbell Bench Press",
+      "modality": "weights" | "cardio" | "bodyweight" | "mobility",
+      "equipment": "string, optional — the machine or kit",
+      "machineSettings": ["seat height"],   // optional, settings worth recording
+      "cues": "string, optional — one line of technique cues",
+      "trackingFields": ["weight", "reps"]  // optional, what the user logs
+    }
+  },
+
   "events": [                    // optional; key dates the plan is built around
     { "name": "Half marathon", "date": "2026-04-12", "notes": "optional" }
   ],
+
   "days": [
     {
-      "id": "d1",                       // unique within the plan
-      "dayNumber": 1,                   // 1..n, the order they are performed
+      "dayNumber": 1,
       "name": "Upper Push",
       "weekday": "Monday",              // optional
       "type": "strength" | "cardio" | "mixed" | "mobility" | "rest",
@@ -33,38 +52,31 @@ omitted, but never invent extra top-level keys.
       "notes": "string, optional",
       "blocks": [
         {
-          "id": "d1b1",
           "kind": "single" | "superset" | "circuit",
           "name": "string, optional — e.g. 'Finisher'",
           "rounds": 3,                          // superset/circuit only
           "restBetweenExercisesSeconds": 15,    // superset/circuit only, optional
           "restAfterBlockSeconds": 120,         // optional
-          "notes": "string, optional",
           "exercises": [
             {
-              "id": "d1b1e1",
-              "name": "Barbell Bench Press",
-              "modality": "weights" | "cardio" | "bodyweight" | "mobility",
-              "equipment": "string, optional — the machine or kit, e.g. 'Flat bench + barbell'",
-              "machineSettings": ["seat height", "pad position"],  // optional, settings worth recording
-              "cues": "string, optional — one line of technique cues",
-              "trackingFields": ["weight", "reps"],  // optional; what the user logs
+              "ref": "bench",          // or write the exercise out in full here
               "sets": [
                 {
                   "type": "warmup" | "working" | "amrap" | "timed" | "distance" | "failure",
+                  "repeat": 3,                     // optional — do this set 3 times
                   "reps": 8,                       // optional
-                  "repRange": [8, 12],             // optional, use INSTEAD of reps for a range
+                  "repRange": [8, 12],             // optional, INSTEAD of reps
                   "targetWeight": 60,              // optional, in the plan's units
                   "targetWeightPercent": 75,       // optional, % of 1RM
-                  "targetIncline": 6,              // optional, treadmill/stepper incline
-                  "targetLevel": 12,               // optional, machine resistance level
-                  "targetSpeed": 10.5,             // optional, km/h or mph per units
-                  "targetDistance": { "value": 400, "unit": "m" },  // unit: m|km|mi|cal|floors
-                  "durationSeconds": 600,          // optional, for timed/cardio sets
+                  "targetIncline": 6,              // optional
+                  "targetLevel": 12,               // optional, machine resistance
+                  "targetSpeed": 10.5,             // optional
+                  "targetDistance": { "value": 400, "unit": "m" },  // m|km|mi|cal|floors
+                  "durationSeconds": 600,          // optional, timed/cardio sets
                   "tempo": "3-1-1",                // optional
                   "rpeTarget": 8,                  // optional, 1-10
                   "restSeconds": 90,               // rest AFTER this set
-                  "drops": [                       // optional drop sets, performed back to back
+                  "drops": [                       // optional drop sets, back to back
                     { "weightPercent": 80, "reps": 8 },
                     { "weightPercent": 60, "toFailure": true }
                   ],
@@ -79,22 +91,45 @@ omitted, but never invent extra top-level keys.
   ]
 }
 
+SHORT FORM — please use it
+
+A written-out plan is long, slow to produce, and easy to make mistakes in.
+These four things cut the output by well over half, and the app expands them
+back out on import. Shorter output is more reliable output.
+
+1. "repeat" instead of copies. Three identical working sets:
+     { "type": "working", "repRange": [6, 8], "targetWeight": 60, "repeat": 3 }
+   NOT three separate set objects. Only write sets out separately when they
+   actually differ — a ramping warm-up, or a last set taken to failure.
+
+2. "defaults" at the top of the plan. Anything listed there is inherited by
+   every set, exercise and block that does not say otherwise, so you never
+   repeat "restSeconds": 90 or "modality": "weights" again.
+
+3. The "exercises" library. Describe each exercise ONCE with its equipment,
+   cues and tracking fields, then use { "ref": "bench", "sets": [...] }
+   wherever it appears. Worth it for anything used on more than one day.
+
+4. Omit every "id". The app generates them. Omit any optional field you would
+   otherwise be guessing at, and omit "notes" unless it says something useful.
+
 RULES
-1. Every set the user performs must be listed explicitly. Do not write
-   "3 x 10" as one set — emit three set objects (they may differ in load).
+
+1. Sets the user performs must all be accounted for, either as separate set
+   objects or via "repeat". "3 x 10" on its own is not enough.
 2. "single" blocks contain exactly one exercise. "superset" and "circuit"
    blocks contain two or more, performed in order each round; give them
-   "rounds" and put one set per round in each exercise's "sets" array.
-3. Rest is always seconds, as a number, on "restSeconds" (after a set) or
-   "restAfterBlockSeconds". Never write "60-90s" or "1 min".
-4. Rest days are days with "type": "rest" and an empty "blocks": [].
-5. Use "trackingFields" to say what the app should ask for: "weight" and
+   "rounds" and one set per round in each exercise's "sets".
+3. Rest is always a number of seconds. Never "60-90s" or "1 min".
+4. Rest days are days with "type": "rest" and "blocks": [].
+5. "trackingFields" says what the app asks the user to record: "weight" and
    "reps" for lifting, "level"/"incline"/"speed"/"distance"/"duration" for
    machines and cardio. Bodyweight movements usually just track "reps".
-6. All ids are unique, non-empty strings.
-7. Numbers are numbers, not strings. No trailing commas. No comments.
-8. If you are unsure of a starting weight, omit "targetWeight" and put the
-   guidance in "notes" — the app shows the user what they lifted last time.`
+6. If you are unsure of a starting weight, leave "targetWeight" out and put the
+   guidance in "notes" — the app shows the user what they lifted last time.
+7. If the plan is long, it is fine to send the days in batches: reply with a
+   complete JSON object containing the first few days, and the app can add
+   later days to the same plan. Never send a partial or truncated object.`
 
 export interface BuilderForm {
   goal: string
@@ -196,6 +231,22 @@ Design a plan that fits the equipment, time and days above. Work up to any key
 dates listed. Include rest days so the week is complete.
 
 ${SCHEMA_SPEC}`
+}
+
+/** Sent back to the AI tool when its JSON could not be read. */
+export function buildFixPrompt(errors: string[], warnings: string[]): string {
+  const problems = errors.map((e) => `- ${e}`).join('\n')
+  const notes = warnings.length
+    ? `\n\nThe app also had to guess at these, so tighten them up if you can:\n${warnings.map((w) => `- ${w}`).join('\n')}`
+    : ''
+  return `The workout plan you sent could not be loaded. The app reported:
+
+${problems}${notes}
+
+Please send the corrected plan as ONE complete JSON object and nothing else — no
+prose, no code fence. Keep everything that was already right; only fix what is
+listed above. Use the short form where you can ("repeat" on a set, plan-level
+"defaults", the "exercises" library with "ref"), and omit all ids.`
 }
 
 /** A short progress digest the user can paste back into their AI tool. */

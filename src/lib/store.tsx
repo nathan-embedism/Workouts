@@ -3,51 +3,12 @@ import {
   type ReactNode,
 } from 'react'
 import type { AppData, Session, SetLog, Settings, StoredPlan, WorkoutPlan } from '../types'
+import {
+  STORAGE_KEY, emptyData, loadData, migrate, readSnapshot, snapshot, type LoadResult,
+} from './storage'
 
-const STORAGE_KEY = 'neon-sets:v1'
-
-export const DEFAULT_SETTINGS: Settings = {
-  units: 'kg',
-  weightIncrement: 2.5,
-  autoStartRest: true,
-  sound: true,
-  vibrate: true,
-  keepAwake: true,
-  remindAfterSessions: 4,
-  remindAfterDays: 10,
-}
-
-function emptyData(): AppData {
-  return { version: 1, settings: { ...DEFAULT_SETTINGS }, plans: [], sessions: [] }
-}
-
-export function loadData(): AppData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return emptyData()
-    const parsed = JSON.parse(raw) as Partial<AppData>
-    return {
-      version: 1,
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
-      plans: Array.isArray(parsed.plans) ? parsed.plans : [],
-      activePlanId: parsed.activePlanId,
-      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-      builderDraft: parsed.builderDraft,
-    }
-  } catch {
-    // A corrupt store should not brick the app — start clean but keep the bad
-    // copy around in case the user wants to recover it.
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) localStorage.setItem(`${STORAGE_KEY}:corrupt:${Date.now()}`, raw)
-    } catch { /* storage unavailable */ }
-    return emptyData()
-  }
-}
-
-export function serialiseBackup(data: AppData): string {
-  return JSON.stringify({ ...data, exportedAt: new Date().toISOString(), app: 'neon-sets' }, null, 2)
-}
+// Re-exported so screens have one place to import persistence helpers from.
+export { DEFAULT_SETTINGS, loadData, migrate, readRescued, serialiseBackup } from './storage'
 
 function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
@@ -61,7 +22,12 @@ interface StoreValue {
   activePlan?: StoredPlan
   activeSession?: Session
   storageError?: string
+  recovery?: { message: string; rescuedKey?: string }
+  dismissRecovery: () => void
+  snapshotAvailable: boolean
+  undoRestore: () => boolean
   importPlan: (plan: WorkoutPlan) => string
+  appendDays: (planId: string, incoming: WorkoutPlan) => number
   removePlan: (id: string) => void
   setActivePlan: (id: string) => void
   startSession: (planId: string, dayId: string, dayName: string, planName: string) => string
@@ -79,8 +45,11 @@ interface StoreValue {
 const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AppData>(() => loadData())
+  const [loaded] = useState<LoadResult>(() => loadData())
+  const [data, setData] = useState<AppData>(loaded.data)
   const [storageError, setStorageError] = useState<string | undefined>()
+  const [recovery, setRecovery] = useState(loaded.recovery)
+  const [snapshotAvailable, setSnapshotAvailable] = useState(() => !!readSnapshot())
   const firstRun = useRef(true)
 
   useEffect(() => {
@@ -111,6 +80,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       settings: { ...prev.settings, units: plan.units },
     }))
     return id
+  }, [])
+
+  /**
+   * Add days from a second import into an existing plan, so a long plan can be
+   * generated a few days at a time instead of in one huge reply.
+   */
+  const appendDays = useCallback((planId: string, incoming: WorkoutPlan) => {
+    let added = 0
+    setData((prev) => ({
+      ...prev,
+      plans: prev.plans.map((stored) => {
+        if (stored.id !== planId) return stored
+        const usedIds = new Set(stored.plan.days.map((d) => d.id))
+        const days = incoming.days.map((day, i) => {
+          let id = day.id
+          while (usedIds.has(id)) id = `${day.id}-${stored.plan.days.length + i + 1}`
+          usedIds.add(id)
+          return { ...day, id, dayNumber: stored.plan.days.length + i + 1 }
+        })
+        added = days.length
+        return {
+          ...stored,
+          plan: {
+            ...stored.plan,
+            days: [...stored.plan.days, ...days],
+            // Later batches may carry plan-level detail the first one lacked.
+            notes: stored.plan.notes ?? incoming.notes,
+            events: [...(stored.plan.events ?? []), ...(incoming.events ?? [])],
+            durationWeeks: stored.plan.durationWeeks ?? incoming.durationWeeks,
+            daysPerWeek: stored.plan.daysPerWeek ?? incoming.daysPerWeek,
+          },
+        }
+      }),
+    }))
+    return added
   }, [])
 
   const removePlan = useCallback((id: string) => {
@@ -209,8 +213,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const replaceAll = useCallback((incoming: AppData) => {
-    setData({ ...emptyData(), ...incoming, version: 1 })
+    // Keep what is being replaced, so a mistaken restore or wipe is recoverable.
+    snapshot()
+    setSnapshotAvailable(true)
+    setData(migrate({ ...emptyData(), ...incoming }).data)
   }, [])
+
+  const undoRestore = useCallback(() => {
+    const previous = readSnapshot()
+    if (!previous) return false
+    setData(previous)
+    return true
+  }, [])
+
+  const dismissRecovery = useCallback(() => setRecovery(undefined), [])
 
   const mergeBackup = useCallback((incoming: AppData) => {
     let addedPlans = 0
@@ -240,11 +256,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     activePlan: data.plans.find((p) => p.id === data.activePlanId) ?? data.plans[0],
     activeSession: [...data.sessions].reverse().find((s) => !s.endedAt),
     storageError,
-    importPlan, removePlan, setActivePlan, startSession, logSet, setStepIndex,
+    recovery,
+    dismissRecovery,
+    snapshotAvailable,
+    undoRestore,
+    importPlan, appendDays, removePlan, setActivePlan, startSession, logSet, setStepIndex,
     finishSession, abandonSession, updateSettings, saveDraft, markExported,
     replaceAll, mergeBackup,
   }), [
-    data, storageError, importPlan, removePlan, setActivePlan, startSession, logSet,
+    data, storageError, recovery, dismissRecovery, snapshotAvailable, undoRestore,
+    importPlan, appendDays, removePlan, setActivePlan, startSession, logSet,
     setStepIndex, finishSession, abandonSession, updateSettings, saveDraft, markExported,
     replaceAll, mergeBackup,
   ])

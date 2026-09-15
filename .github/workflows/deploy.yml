@@ -24,6 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:data
+      - run: npm run test:format
       - name: Build
         # Project pages are served from /<repo>/, so the bundle needs that base.
         run: npm run build

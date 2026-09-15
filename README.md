@@ -84,9 +84,34 @@ constant is what gets copied into your prompt), and the types live in
 }
 ```
 
-Every set is listed explicitly — `3 x 10` becomes three set objects — so the
-runner always knows exactly what to put on screen next. Rest is always a number
-of seconds. Rest days are `"type": "rest"` with `"blocks": []`.
+### Keeping the AI's output short
+
+Long output is slow and it is where models drop details. The format has four
+ways to say the same plan in less, all expanded on import so the runner only
+ever sees fully written-out plans:
+
+| Short form | Instead of |
+|---|---|
+| `"repeat": 3` on a set | three identical set objects |
+| `"defaults": { "restSeconds": 90, … }` | repeating rest, modality and tracking on every set |
+| `"exercises": { "bench": {…} }` + `{ "ref": "bench" }` | re-describing equipment, cues and settings on every day |
+| omitting every `"id"` | hand-written ids the app generates anyway |
+
+On a representative plan — 5 days, 5 exercises each, 100 sets — that is
+**15,132 characters down to 7,104, a 53% reduction**, expanding to a byte-identical
+plan. Both forms import; the prompt asks for the short one.
+
+Two more things help when a model still struggles:
+
+- **Import in batches.** Ask for a few days at a time; each reply is a complete
+  JSON object, and the import screen offers to add its days to the plan you
+  already have rather than starting a new one.
+- **Fix requests.** When a plan fails to validate, one button copies the exact
+  errors back as a correction prompt, so the model repairs rather than
+  regenerates.
+
+Rest is always a number of seconds. Rest days are `"type": "rest"` with
+`"blocks": []`.
 
 The importer is deliberately forgiving: it strips markdown fences and
 surrounding chatter, fills in sensible defaults, and reports what it changed.
@@ -104,6 +129,24 @@ That means:
 - **Download backups.** The Data tab exports a JSON file with every plan and
   every logged set, and reminds you when you're overdue.
 
+### Updates never touch what you've logged
+
+Saved data lives under one key (`neon-sets:v1`) that app updates do not rewrite,
+and four rules keep it that way:
+
+- **Unknown fields are carried through.** `migrate()` spreads whatever it finds
+  before normalising the fields it knows, so data written by a newer build (or
+  by a build you later roll back from) is preserved rather than stripped.
+- **Nothing is deleted on read.** Data that cannot be parsed is moved aside
+  under its own key and reported in the Data tab with a download button — the
+  app never silently replaces it with an empty store.
+- **Destructive actions are snapshotted.** Restoring a backup or deleting
+  everything keeps a copy first; "Undo the last restore" puts it back.
+- **Writes only happen on change.** Loading the app never writes.
+
+`npm run test:data` guards all of it against the real persistence layer, and
+runs in CI on every push.
+
 ## Development
 
 ```bash
@@ -112,7 +155,11 @@ npm run dev        # http://localhost:5173/Workouts/
 npm run build      # typecheck + production bundle into dist/
 npm run preview    # serve the built bundle
 npm run icons      # regenerate the app icons from scripts/make-icons.mjs
+npm run test:data  # saved data survives an app update
+npm run test:format # the short plan form expands to the same plan, and is smaller
 ```
+
+Both checks run in CI on every push and before every deploy.
 
 Stack: Vite + React + TypeScript, `vite-plugin-pwa` for the service worker and
 manifest. No UI framework, no state library, no runtime dependencies beyond

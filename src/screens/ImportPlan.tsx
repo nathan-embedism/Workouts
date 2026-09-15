@@ -2,12 +2,14 @@ import { useState } from 'react'
 import type { Navigate } from '../App'
 import { useStore } from '../lib/store'
 import { parseAndValidate, type ValidationResult } from '../lib/validate'
+import { buildFixPrompt } from '../lib/schema'
+import { copyText } from '../lib/hooks'
 import { demoPlan } from '../lib/demoPlan'
 import { countSets } from '../lib/steps'
 import { Banner, useFlash } from '../components/ui'
 
 export default function ImportPlan({ navigate }: { navigate: Navigate }) {
-  const { importPlan, plans, activePlan, setActivePlan, removePlan } = useStore()
+  const { importPlan, appendDays, plans, activePlan, setActivePlan, removePlan } = useStore()
   const flash = useFlash()
   const [raw, setRaw] = useState('')
   const [result, setResult] = useState<ValidationResult | null>(null)
@@ -24,6 +26,21 @@ export default function ImportPlan({ navigate }: { navigate: Navigate }) {
     setRaw('')
     setResult(null)
     navigate('/')
+  }
+
+  const addToCurrent = () => {
+    if (!result?.plan || !activePlan) return
+    const added = appendDays(activePlan.id, result.plan)
+    flash(`${added} day${added === 1 ? '' : 's'} added to ${activePlan.plan.planName}`)
+    setRaw('')
+    setResult(null)
+    navigate('/')
+  }
+
+  const copyFixRequest = async () => {
+    if (!result) return
+    const text = buildFixPrompt(result.errors, result.warnings)
+    flash(await copyText(text) ? 'Copied — paste it back to your AI tool' : 'Copy failed')
   }
 
   return (
@@ -76,6 +93,9 @@ export default function ImportPlan({ navigate }: { navigate: Navigate }) {
             {result.errors.slice(0, 8).map((error, i) => <li key={i}>{error}</li>)}
           </ul>
           {result.errors.length > 8 && <p className="hint">…and {result.errors.length - 8} more.</p>}
+          <button className="btn btn--sm btn--ghost" style={{ marginTop: 10 }} onClick={copyFixRequest}>
+            Copy a fix request
+          </button>
         </Banner>
       )}
 
@@ -112,6 +132,17 @@ export default function ImportPlan({ navigate }: { navigate: Navigate }) {
           <button className="btn btn--primary btn--block btn--xl" onClick={useThisPlan}>
             Use this plan
           </button>
+          {activePlan && (
+            <button className="btn btn--ghost btn--block" onClick={addToCurrent}>
+              Add {result.plan.days.length} day{result.plan.days.length === 1 ? '' : 's'} to “{activePlan.plan.planName}”
+            </button>
+          )}
+          {activePlan && (
+            <p className="hint">
+              Generating a long plan in one go is where AI tools tend to slip. Ask for a few
+              days at a time and add each batch to the plan you already have.
+            </p>
+          )}
         </div>
       )}
 

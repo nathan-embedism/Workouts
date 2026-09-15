@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Navigate } from '../App'
 import type { AppData } from '../types'
-import { useStore, serialiseBackup, DEFAULT_SETTINGS } from '../lib/store'
+import { useStore, serialiseBackup, readRescued, DEFAULT_SETTINGS } from '../lib/store'
 import { backupStatus, progressSummary } from '../lib/history'
 import { buildFeedbackPrompt } from '../lib/schema'
 import { copyText, downloadFile, useIsStandalone } from '../lib/hooks'
@@ -11,6 +11,7 @@ import { Banner, Field, Toggle, useFlash } from '../components/ui'
 export default function DataScreen({ navigate }: { navigate: Navigate }) {
   const {
     data, settings, sessions, updateSettings, markExported, mergeBackup, replaceAll, storageError,
+    recovery, dismissRecovery, snapshotAvailable, undoRestore,
   } = useStore()
   const flash = useFlash()
   const standalone = useIsStandalone()
@@ -60,6 +61,29 @@ export default function DataScreen({ navigate }: { navigate: Navigate }) {
       </header>
 
       {storageError && <Banner tone="error">{storageError}</Banner>}
+
+      {recovery && (
+        <Banner tone="warn">
+          <strong>Heads up</strong>
+          <p className="small" style={{ marginTop: 4 }}>{recovery.message}</p>
+          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            {recovery.rescuedKey && (
+              <button
+                className="btn btn--sm btn--ghost"
+                onClick={() => {
+                  const rescued = readRescued(recovery.rescuedKey!)
+                  if (!rescued) { flash('That copy is no longer on the device'); return }
+                  downloadFile(`neon-sets-unreadable-${new Date().toISOString().slice(0, 10)}.json`, rescued, 'text/plain')
+                  flash('Saved the unreadable copy')
+                }}
+              >
+                Download it
+              </button>
+            )}
+            <button className="btn btn--sm btn--quiet" onClick={dismissRecovery}>Dismiss</button>
+          </div>
+        </Banner>
+      )}
 
       <div className={`card ${backup.due ? 'card--glow' : ''}`}>
         <div className="card__label">Your data lives on this device</div>
@@ -113,6 +137,21 @@ export default function DataScreen({ navigate }: { navigate: Navigate }) {
           </label>
         </div>
         <p className="hint">Merging keeps what's already here and adds anything missing.</p>
+        {snapshotAvailable && (
+          <button
+            className="btn btn--ghost btn--block btn--sm"
+            onClick={() => {
+              if (!window.confirm('Put back the data as it was before the last restore or wipe?')) return
+              flash(undoRestore() ? 'Previous data put back' : 'Nothing to put back')
+            }}
+          >
+            Undo the last restore
+          </button>
+        )}
+        <p className="hint">
+          Replacing or deleting keeps a copy of what was there first, so a wrong tap is not the
+          end of your training log.
+        </p>
       </div>
 
       <div className="card">

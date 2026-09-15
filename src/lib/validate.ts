@@ -1,6 +1,6 @@
 import type {
   Block, BlockKind, DayType, DistanceTarget, DropSet, Exercise, Modality,
-  PlanDay, PlanEvent, SetType, TrackingField, Units, WorkoutPlan, WorkoutSet,
+  PlanDay, PlanDefaults, PlanEvent, SetType, TrackingField, Units, WorkoutPlan, WorkoutSet,
 } from '../types'
 
 export interface ValidationResult {
@@ -86,6 +86,36 @@ export function validatePlan(input: unknown): ValidationResult {
     units = 'kg'
   }
 
+  // The short form: values inherited by anything that leaves them out, and a
+  // library of exercises referenced by id. Both are expanded away here, so the
+  // rest of the app only ever sees fully written-out plans.
+  const defaults: PlanDefaults = {}
+  if (isObj(input.defaults)) {
+    const d = input.defaults
+    const restSeconds = num(d.restSeconds)
+    if (restSeconds !== undefined) defaults.restSeconds = restSeconds
+    const restAfterBlockSeconds = num(d.restAfterBlockSeconds)
+    if (restAfterBlockSeconds !== undefined) defaults.restAfterBlockSeconds = restAfterBlockSeconds
+    const modality = str(d.modality)?.toLowerCase() as Modality | undefined
+    if (modality && MODALITIES.includes(modality)) defaults.modality = modality
+    const setType = str(d.setType)?.toLowerCase() as SetType | undefined
+    if (setType && SET_TYPES.includes(setType)) defaults.setType = setType
+    const tempo = str(d.tempo)
+    if (tempo) defaults.tempo = tempo
+    const tracking = strArray(d.trackingFields)
+      ?.map((f) => f.toLowerCase())
+      .filter((f): f is TrackingField => TRACKING.includes(f as TrackingField))
+    if (tracking?.length) defaults.trackingFields = tracking
+  }
+
+  const library: Record<string, Record<string, unknown>> = {}
+  if (isObj(input.exercises)) {
+    for (const [id, template] of Object.entries(input.exercises)) {
+      if (isObj(template)) library[id] = template
+      else warnings.push(`exercises["${id}"] is not an object — ignored.`)
+    }
+  }
+
   const rawDays = input.days
   if (!Array.isArray(rawDays)) {
     errors.push('Missing "days" — it must be an array of workout days.')
@@ -148,12 +178,25 @@ export function validatePlan(input: unknown): ValidationResult {
           }
 
           const exercises: Exercise[] = []
-          rawExercises.forEach((rawEx, ei) => {
+          rawExercises.forEach((rawUse, ei) => {
             const eWhere = `${bWhere}.exercises[${ei}]`
-            if (!isObj(rawEx)) {
+            if (!isObj(rawUse)) {
               errors.push(`${eWhere} is not an object.`)
               return
             }
+
+            // `ref` pulls in a library entry; anything written here wins over it.
+            let rawEx: Record<string, unknown> = rawUse
+            const ref = str(rawUse.ref)
+            if (ref) {
+              const template = library[ref]
+              if (!template) {
+                errors.push(`${eWhere} references "${ref}", which is not in the plan's "exercises" library.`)
+                return
+              }
+              rawEx = { ...template, ...rawUse }
+            }
+
             const exName = str(rawEx.name)
             if (!exName) {
               errors.push(`${eWhere} is missing "name".`)
@@ -162,7 +205,7 @@ export function validatePlan(input: unknown): ValidationResult {
 
             let modality = str(rawEx.modality)?.toLowerCase() as Modality | undefined
             if (!modality || !MODALITIES.includes(modality)) {
-              modality = type === 'cardio' ? 'cardio' : 'weights'
+              modality = defaults.modality ?? (type === 'cardio' ? 'cardio' : 'weights')
             }
 
             const rawSets = rawEx.sets
@@ -181,7 +224,7 @@ export function validatePlan(input: unknown): ValidationResult {
                   if (str(rawSet.type)) {
                     warnings.push(`${sWhere}.type was "${str(rawSet.type)}" — treating it as "working".`)
                   }
-                  setType = 'working'
+                  setType = defaults.setType ?? 'working'
                 }
 
                 const set: WorkoutSet = { type: setType }
@@ -221,7 +264,11 @@ export function validatePlan(input: unknown): ValidationResult {
                   }
                 }
 
-                const tempo = str(rawSet.tempo)
+                if (set.restSeconds === undefined && defaults.restSeconds !== undefined) {
+                  set.restSeconds = defaults.restSeconds
+                }
+
+                const tempo = str(rawSet.tempo) ?? defaults.tempo
                 if (tempo) set.tempo = tempo
                 const setNotes = str(rawSet.notes)
                 if (setNotes) set.notes = setNotes
@@ -243,13 +290,25 @@ export function validatePlan(input: unknown): ValidationResult {
                   if (drops.length) set.drops = drops
                 }
 
-                sets.push(set)
+                const repeat = num(rawSet.repeat) ?? 1
+                if (repeat > 50) {
+                  warnings.push(`${sWhere}.repeat was ${repeat} — capped at 50 sets.`)
+                } else if (repeat < 1) {
+                  warnings.push(`${sWhere}.repeat was ${repeat} — treating it as one set.`)
+                }
+                const times = Math.max(1, Math.min(50, Math.round(repeat)))
+                for (let copy = 0; copy < times; copy++) {
+                  // Each repeat is its own object: the runner logs against them
+                  // individually and drops arrays must not be shared.
+                  sets.push({ ...set, ...(set.drops ? { drops: set.drops.map((d) => ({ ...d })) } : {}) })
+                }
               })
             }
 
-            const tracking = strArray(rawEx.trackingFields)
+            const tracking = (strArray(rawEx.trackingFields)
               ?.map((f) => f.toLowerCase())
-              .filter((f): f is TrackingField => TRACKING.includes(f as TrackingField))
+              .filter((f): f is TrackingField => TRACKING.includes(f as TrackingField)))
+              ?? defaults.trackingFields
 
             const exercise: Exercise = {
               id: str(rawEx.id) ?? `${id}-b${bi + 1}-e${ei + 1}`,
@@ -290,7 +349,7 @@ export function validatePlan(input: unknown): ValidationResult {
           if (rounds !== undefined) block.rounds = rounds
           const restBetween = num(rawBlock.restBetweenExercisesSeconds)
           if (restBetween !== undefined) block.restBetweenExercisesSeconds = restBetween
-          const restAfter = num(rawBlock.restAfterBlockSeconds)
+          const restAfter = num(rawBlock.restAfterBlockSeconds) ?? defaults.restAfterBlockSeconds
           if (restAfter !== undefined) block.restAfterBlockSeconds = restAfter
           const blockNotes = str(rawBlock.notes)
           if (blockNotes) block.notes = blockNotes
