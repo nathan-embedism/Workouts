@@ -1,0 +1,496 @@
+{
+  "schemaVersion": 1,
+  "planName": "8-Week Strength Base",
+  "goal": "Add size and strength to the big lifts while keeping the knees happy",
+  "units": "kg",
+  "durationWeeks": 8,
+  "daysPerWeek": 4,
+  "notes": "Add 2.5 kg once you hit the top of the rep range on every working set. Deload week 5.",
+  "defaults": {
+    "restSeconds": 90,
+    "restAfterBlockSeconds": 90,
+    "modality": "weights",
+    "setType": "working",
+    "trackingFields": [
+      "weight",
+      "reps"
+    ]
+  },
+  "exercises": {
+    "bench": {
+      "name": "Barbell Bench Press",
+      "equipment": "Flat bench + barbell",
+      "machineSettings": [
+        "bench position"
+      ],
+      "cues": "Shoulder blades down and back, bar to lower chest."
+    },
+    "incline": {
+      "name": "Incline Dumbbell Press",
+      "equipment": "Adjustable bench + dumbbells",
+      "machineSettings": [
+        "bench angle"
+      ]
+    },
+    "lateral": {
+      "name": "Dumbbell Lateral Raise",
+      "equipment": "Dumbbells"
+    },
+    "pushdown": {
+      "name": "Cable Triceps Pushdown",
+      "equipment": "Cable machine",
+      "machineSettings": [
+        "pulley height"
+      ]
+    },
+    "squat": {
+      "name": "Back Squat",
+      "equipment": "Squat rack + barbell",
+      "machineSettings": [
+        "rack pin height"
+      ],
+      "cues": "Brace hard, knees out, full depth."
+    },
+    "rdl": {
+      "name": "Romanian Deadlift",
+      "equipment": "Barbell"
+    },
+    "legcurl": {
+      "name": "Seated Leg Curl",
+      "equipment": "Leg curl machine",
+      "machineSettings": [
+        "seat position",
+        "pad position"
+      ]
+    },
+    "stairs": {
+      "name": "Stair Climber Intervals",
+      "modality": "cardio",
+      "equipment": "Stair climber",
+      "trackingFields": [
+        "level",
+        "duration"
+      ]
+    },
+    "pulldown": {
+      "name": "Lat Pulldown",
+      "equipment": "Lat pulldown machine",
+      "machineSettings": [
+        "knee pad height",
+        "grip width"
+      ]
+    },
+    "row": {
+      "name": "Chest Supported Row",
+      "equipment": "Row machine",
+      "machineSettings": [
+        "chest pad height"
+      ]
+    },
+    "curl": {
+      "name": "Incline Dumbbell Curl",
+      "equipment": "Adjustable bench + dumbbells"
+    },
+    "knees": {
+      "name": "Hanging Knee Raise",
+      "modality": "bodyweight",
+      "equipment": "Pull-up bar",
+      "trackingFields": [
+        "reps"
+      ]
+    }
+  },
+  "events": [
+    {
+      "name": "Charity 10k",
+      "date": "2026-11-01",
+      "notes": "Keep the legs fresh the week before."
+    }
+  ],
+  "days": [
+    {
+      "dayNumber": 1,
+      "name": "Upper Push",
+      "weekday": "Monday",
+      "type": "strength",
+      "focus": [
+        "chest",
+        "shoulders",
+        "triceps"
+      ],
+      "estimatedMinutes": 55,
+      "blocks": [
+        {
+          "kind": "single",
+          "restAfterBlockSeconds": 120,
+          "exercises": [
+            {
+              "ref": "bench",
+              "sets": [
+                {
+                  "type": "warmup",
+                  "reps": 10,
+                  "targetWeight": 20,
+                  "restSeconds": 60
+                },
+                {
+                  "repRange": [
+                    6,
+                    8
+                  ],
+                  "targetWeight": 60,
+                  "rpeTarget": 8,
+                  "restSeconds": 120,
+                  "repeat": 2
+                },
+                {
+                  "repRange": [
+                    6,
+                    8
+                  ],
+                  "targetWeight": 60,
+                  "rpeTarget": 9,
+                  "restSeconds": 120
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "single",
+          "exercises": [
+            {
+              "ref": "incline",
+              "sets": [
+                {
+                  "repRange": [
+                    8,
+                    12
+                  ],
+                  "targetWeight": 22,
+                  "rpeTarget": 8,
+                  "repeat": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "superset",
+          "name": "Shoulders + triceps",
+          "rounds": 3,
+          "restBetweenExercisesSeconds": 15,
+          "restAfterBlockSeconds": 90,
+          "exercises": [
+            {
+              "ref": "lateral",
+              "sets": [
+                {
+                  "repRange": [
+                    12,
+                    15
+                  ],
+                  "targetWeight": 8,
+                  "repeat": 3
+                }
+              ]
+            },
+            {
+              "ref": "pushdown",
+              "sets": [
+                {
+                  "reps": 12,
+                  "targetWeight": 25,
+                  "repeat": 2
+                },
+                {
+                  "reps": 12,
+                  "targetWeight": 25,
+                  "drops": [
+                    {
+                      "weightPercent": 70,
+                      "reps": 10
+                    },
+                    {
+                      "weightPercent": 50,
+                      "toFailure": true
+                    }
+                  ],
+                  "notes": "Strip the stack twice, no rest between drops."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "dayNumber": 2,
+      "name": "Lower",
+      "weekday": "Tuesday",
+      "type": "mixed",
+      "focus": [
+        "legs",
+        "glutes"
+      ],
+      "estimatedMinutes": 60,
+      "blocks": [
+        {
+          "kind": "single",
+          "restAfterBlockSeconds": 150,
+          "exercises": [
+            {
+              "ref": "squat",
+              "sets": [
+                {
+                  "type": "warmup",
+                  "reps": 8,
+                  "targetWeight": 40,
+                  "restSeconds": 60
+                },
+                {
+                  "reps": 5,
+                  "targetWeight": 80,
+                  "rpeTarget": 8,
+                  "restSeconds": 150,
+                  "repeat": 2
+                },
+                {
+                  "reps": 5,
+                  "targetWeight": 80,
+                  "rpeTarget": 9,
+                  "restSeconds": 150
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "single",
+          "exercises": [
+            {
+              "ref": "rdl",
+              "sets": [
+                {
+                  "repRange": [
+                    8,
+                    10
+                  ],
+                  "targetWeight": 60,
+                  "rpeTarget": 8,
+                  "repeat": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "single",
+          "exercises": [
+            {
+              "ref": "legcurl",
+              "sets": [
+                {
+                  "repRange": [
+                    10,
+                    12
+                  ],
+                  "targetWeight": 35,
+                  "repeat": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "single",
+          "restAfterBlockSeconds": 60,
+          "exercises": [
+            {
+              "ref": "stairs",
+              "sets": [
+                {
+                  "type": "timed",
+                  "durationSeconds": 120,
+                  "targetLevel": 8,
+                  "restSeconds": 60
+                },
+                {
+                  "type": "timed",
+                  "durationSeconds": 120,
+                  "targetLevel": 10,
+                  "restSeconds": 60
+                },
+                {
+                  "type": "timed",
+                  "durationSeconds": 120,
+                  "targetLevel": 12,
+                  "rpeTarget": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "dayNumber": 3,
+      "name": "Rest",
+      "weekday": "Wednesday",
+      "type": "rest",
+      "blocks": []
+    },
+    {
+      "dayNumber": 4,
+      "name": "Upper Pull",
+      "weekday": "Thursday",
+      "type": "strength",
+      "focus": [
+        "back",
+        "biceps"
+      ],
+      "estimatedMinutes": 50,
+      "blocks": [
+        {
+          "kind": "single",
+          "exercises": [
+            {
+              "ref": "pulldown",
+              "sets": [
+                {
+                  "repRange": [
+                    8,
+                    12
+                  ],
+                  "targetWeight": 50,
+                  "repeat": 2
+                },
+                {
+                  "repRange": [
+                    8,
+                    12
+                  ],
+                  "targetWeight": 50,
+                  "rpeTarget": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "single",
+          "exercises": [
+            {
+              "ref": "row",
+              "sets": [
+                {
+                  "repRange": [
+                    8,
+                    12
+                  ],
+                  "targetWeight": 45,
+                  "rpeTarget": 8,
+                  "repeat": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "superset",
+          "name": "Arms + core",
+          "rounds": 3,
+          "restBetweenExercisesSeconds": 15,
+          "exercises": [
+            {
+              "ref": "curl",
+              "sets": [
+                {
+                  "repRange": [
+                    10,
+                    12
+                  ],
+                  "targetWeight": 12,
+                  "repeat": 3
+                }
+              ]
+            },
+            {
+              "ref": "knees",
+              "sets": [
+                {
+                  "repRange": [
+                    10,
+                    15
+                  ],
+                  "repeat": 2
+                },
+                {
+                  "type": "amrap",
+                  "rpeTarget": 10
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "dayNumber": 5,
+      "name": "Rest",
+      "weekday": "Friday",
+      "type": "rest",
+      "blocks": []
+    },
+    {
+      "dayNumber": 6,
+      "name": "Lower B",
+      "weekday": "Saturday",
+      "type": "strength",
+      "focus": [
+        "legs"
+      ],
+      "estimatedMinutes": 45,
+      "blocks": [
+        {
+          "kind": "single",
+          "restAfterBlockSeconds": 120,
+          "exercises": [
+            {
+              "ref": "rdl",
+              "sets": [
+                {
+                  "repRange": [
+                    6,
+                    8
+                  ],
+                  "targetWeight": 70,
+                  "rpeTarget": 8,
+                  "repeat": 4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "single",
+          "exercises": [
+            {
+              "ref": "legcurl",
+              "sets": [
+                {
+                  "repRange": [
+                    12,
+                    15
+                  ],
+                  "targetWeight": 30,
+                  "repeat": 3
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

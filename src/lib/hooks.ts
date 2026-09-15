@@ -129,6 +129,62 @@ export function downloadFile(filename: string, contents: string, type = 'applica
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+export interface StorageStatus {
+  supported: boolean
+  /** The browser has promised not to evict this data to reclaim space. */
+  persisted: boolean
+  usageBytes?: number
+  quotaBytes?: number
+}
+
+/**
+ * What the browser will say about the durability of what we've saved. Safari
+ * grants persistence largely on whether the app was added to the home screen.
+ */
+export function useStorageStatus(): StorageStatus {
+  const [status, setStatus] = useState<StorageStatus>({ supported: false, persisted: false })
+
+  useEffect(() => {
+    let cancelled = false
+    const read = async () => {
+      if (!navigator.storage?.estimate) return
+      try {
+        const [estimate, persisted] = await Promise.all([
+          navigator.storage.estimate(),
+          navigator.storage.persisted?.() ?? Promise.resolve(false),
+        ])
+        if (cancelled) return
+        setStatus({
+          supported: true,
+          persisted,
+          usageBytes: estimate.usage,
+          quotaBytes: estimate.quota,
+        })
+      } catch { /* unsupported or blocked */ }
+    }
+    void read()
+    return () => { cancelled = true }
+  }, [])
+
+  return status
+}
+
+/** Ask the browser to protect this origin's data. Resolves to the new state. */
+export async function requestPersistence(): Promise<boolean> {
+  try {
+    return (await navigator.storage?.persist?.()) ?? false
+  } catch {
+    return false
+  }
+}
+
+export function formatBytes(bytes?: number): string {
+  if (bytes === undefined) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 /** True once the app is running from the home screen rather than a browser tab. */
 export function useIsStandalone(): boolean {
   const [standalone] = useState(() => {
