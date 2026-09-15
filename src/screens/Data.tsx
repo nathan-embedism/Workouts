@@ -4,7 +4,9 @@ import type { AppData } from '../types'
 import { useStore, serialiseBackup, readRescued, DEFAULT_SETTINGS } from '../lib/store'
 import { backupStatus, progressSummary } from '../lib/history'
 import { buildFeedbackPrompt } from '../lib/schema'
-import { copyText, downloadFile, useIsStandalone } from '../lib/hooks'
+import {
+  copyText, downloadFile, formatBytes, requestPersistence, useIsStandalone, useStorageStatus,
+} from '../lib/hooks'
 import { relativeDays } from '../lib/format'
 import { Banner, Field, Toggle, useFlash } from '../components/ui'
 
@@ -15,8 +17,11 @@ export default function DataScreen({ navigate }: { navigate: Navigate }) {
   } = useStore()
   const flash = useFlash()
   const standalone = useIsStandalone()
+  const storage = useStorageStatus()
+  const [persisted, setPersisted] = useState<boolean | null>(null)
   const [restoreNote, setRestoreNote] = useState<string | null>(null)
   const backup = backupStatus(settings, sessions)
+  const isPersisted = persisted ?? storage.persisted
 
   const exportBackup = () => {
     const stamp = new Date().toISOString().slice(0, 10)
@@ -104,6 +109,56 @@ export default function DataScreen({ navigate }: { navigate: Navigate }) {
         <p className="hint">
           The summary is plain text: what you lifted, for how many reps, at what RPE — ready to
           paste back into your AI tool so your next plan is built on real numbers.
+        </p>
+      </div>
+
+      <div className="card">
+        <div className="card__label">How safe is it on this device?</div>
+        <div className="stack-sm">
+          <div className="log-line">
+            <span>Survives closing the app and restarting the phone</span>
+            <span style={{ color: 'var(--lime)' }}>Yes</span>
+          </div>
+          <div className="log-line">
+            <span>Protected from being cleared to free up space</span>
+            <span style={{ color: isPersisted ? 'var(--lime)' : 'var(--amber)' }}>
+              {storage.supported ? (isPersisted ? 'Yes' : 'Not yet') : 'Unknown'}
+            </span>
+          </div>
+          <div className="log-line">
+            <span>Installed to the home screen</span>
+            <span style={{ color: standalone ? 'var(--lime)' : 'var(--amber)' }}>
+              {standalone ? 'Yes' : 'No'}
+            </span>
+          </div>
+          {storage.usageBytes !== undefined && (
+            <div className="log-line">
+              <span>Space used</span>
+              <span className="dim">
+                {formatBytes(storage.usageBytes)}
+                {storage.quotaBytes ? ` of ${formatBytes(storage.quotaBytes)}` : ''}
+              </span>
+            </div>
+          )}
+        </div>
+        {!isPersisted && storage.supported && (
+          <button
+            className="btn btn--ghost btn--block btn--sm"
+            onClick={async () => {
+              const granted = await requestPersistence()
+              setPersisted(granted)
+              flash(granted
+                ? 'The browser will now protect your data'
+                : 'The browser said no — installing to the home screen usually changes its mind')
+            }}
+          >
+            Ask the browser to protect it
+          </button>
+        )}
+        <p className="hint">
+          Your training log is written to the device's disk, so it survives restarts, closing
+          the app, and being offline. It is still lost if you delete the app or clear this
+          site's data in browser settings — which is why the backups above matter.
         </p>
       </div>
 
