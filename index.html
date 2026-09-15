@@ -15,7 +15,33 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Replaced the moment the app mounts. It only ever becomes visible if the
+           bundle failed to load — e.g. GitHub Pages serving this source file
+           straight from the repo instead of the built output in dist/. -->
+      <div id="boot-fallback">
+        <h1>Neon Sets</h1>
+        <p>The app didn't start. If you're seeing this on GitHub Pages, the site is
+           serving the repository source rather than the built bundle — set
+           <strong>Settings → Pages → Source</strong> to <strong>GitHub Actions</strong>
+           and re-run the deploy workflow.</p>
+      </div>
+      <style>
+        #boot-fallback {
+          opacity: 0;
+          animation: boot-fallback-in 0.3s ease 2.5s forwards;
+          max-width: 34rem;
+          margin: 0 auto;
+          padding: 3rem 1.5rem;
+          font-family: system-ui, sans-serif;
+          color: #e9edfb;
+          line-height: 1.55;
+        }
+        #boot-fallback h1 { font-size: 1.6rem; margin: 0 0 0.75rem; }
+        #boot-fallback p { margin: 0; color: #8e97b8; }
+        @keyframes boot-fallback-in { to { opacity: 1; } }
+      </style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
