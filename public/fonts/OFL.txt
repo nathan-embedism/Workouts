@@ -1,0 +1,4 @@
+The font files in this directory (Barlow Condensed, Big Shoulders Display) are
+licensed under the SIL Open Font License, Version 1.1.
+Full text: https://scripts.sil.org/OFL
+Source: https://fonts.google.com
