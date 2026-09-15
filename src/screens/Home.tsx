@@ -108,9 +108,14 @@ export default function Home({ navigate }: { navigate: Navigate }) {
       )}
 
       {upcomingEvents.length > 0 && (
-        <div className="card card--tight">
+        <button
+          type="button"
+          className="card card--tight"
+          style={{ textAlign: 'left' }}
+          onClick={() => navigate('/schedule')}
+        >
           <div className="card__label">Key dates</div>
-          {upcomingEvents.map((event) => (
+          {upcomingEvents.slice(0, 3).map((event) => (
             <div key={`${event.name}-${event.date}`} className="row-between">
               <span className="grow truncate">{event.name}</span>
               <span className="pill pill--warm">
@@ -118,16 +123,15 @@ export default function Home({ navigate }: { navigate: Navigate }) {
               </span>
             </div>
           ))}
-        </div>
+        </button>
       )}
 
       <section className="stack-sm">
         <div className="row-between">
           <div className="eyebrow">The plan</div>
-          <span className="tiny dim">
-            {plan.daysPerWeek ? `${plan.daysPerWeek}/week` : `${plan.days.length} days`}
-            {plan.durationWeeks ? ` · ${plan.durationWeeks} weeks` : ''}
-          </span>
+          <button className="btn btn--quiet btn--sm" onClick={() => navigate('/schedule')}>
+            Schedule &amp; dates →
+          </button>
         </div>
         {plan.days.map((day) => {
           const isRest = day.type === 'rest' || day.blocks.length === 0

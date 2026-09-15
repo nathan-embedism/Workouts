@@ -3,12 +3,14 @@ import type { Navigate } from '../App'
 import { useStore } from '../lib/store'
 import { clockTime, relativeDays, roundLoad, shortDate } from '../lib/format'
 import { normaliseName } from '../lib/history'
+import Progress from './Progress'
 import { Banner } from '../components/ui'
 
 export default function History({ navigate }: { navigate: Navigate }) {
   const { sessions, settings } = useStore()
   const [openId, setOpenId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [view, setView] = useState<'sessions' | 'progress'>('sessions')
 
   const finished = useMemo(
     () => sessions.filter((s) => s.endedAt).sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
@@ -40,7 +42,18 @@ export default function History({ navigate }: { navigate: Navigate }) {
         </div>
       </header>
 
-      {finished.length === 0 ? (
+      <div className="chips">
+        {([['sessions', 'Sessions'], ['progress', 'Progress']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`chip${view === id ? ' chip--on' : ''}`}
+            onClick={() => setView(id)}
+          >{label}</button>
+        ))}
+      </div>
+
+      {view === 'progress' ? <Progress /> : finished.length === 0 ? (
         <Banner tone="info">
           No finished workouts yet. Start one from the Today tab and it'll show up here.
         </Banner>

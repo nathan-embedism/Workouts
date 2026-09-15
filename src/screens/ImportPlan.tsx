@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Navigate } from '../App'
 import { useStore } from '../lib/store'
 import { parseAndValidate, type ValidationResult } from '../lib/validate'
-import { DEMO_PLAN } from '../lib/demoPlan'
+import { demoPlan } from '../lib/demoPlan'
 import { countSets } from '../lib/steps'
 import { Banner, useFlash } from '../components/ui'
 
@@ -121,7 +121,7 @@ export default function ImportPlan({ navigate }: { navigate: Navigate }) {
           <p className="small muted">Load a small demo plan to see how the runner works.</p>
           <button
             className="btn btn--ghost btn--block"
-            onClick={() => check(JSON.stringify(DEMO_PLAN, null, 2))}
+            onClick={() => check(JSON.stringify(demoPlan(), null, 2))}
           >
             Load demo plan
           </button>
