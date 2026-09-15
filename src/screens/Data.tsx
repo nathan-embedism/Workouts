@@ -1,21 +1,27 @@
 import { useState } from 'react'
 import type { Navigate } from '../App'
 import type { AppData } from '../types'
-import { useStore, serialiseBackup, DEFAULT_SETTINGS } from '../lib/store'
+import { useStore, serialiseBackup, readRescued, DEFAULT_SETTINGS } from '../lib/store'
 import { backupStatus, progressSummary } from '../lib/history'
 import { buildFeedbackPrompt } from '../lib/schema'
-import { copyText, downloadFile, useIsStandalone } from '../lib/hooks'
+import {
+  copyText, downloadFile, formatBytes, requestPersistence, useIsStandalone, useStorageStatus,
+} from '../lib/hooks'
 import { relativeDays } from '../lib/format'
 import { Banner, Field, Toggle, useFlash } from '../components/ui'
 
 export default function DataScreen({ navigate }: { navigate: Navigate }) {
   const {
     data, settings, sessions, updateSettings, markExported, mergeBackup, replaceAll, storageError,
+    recovery, dismissRecovery, snapshotAvailable, undoRestore,
   } = useStore()
   const flash = useFlash()
   const standalone = useIsStandalone()
+  const storage = useStorageStatus()
+  const [persisted, setPersisted] = useState<boolean | null>(null)
   const [restoreNote, setRestoreNote] = useState<string | null>(null)
   const backup = backupStatus(settings, sessions)
+  const isPersisted = persisted ?? storage.persisted
 
   const exportBackup = () => {
     const stamp = new Date().toISOString().slice(0, 10)
@@ -61,6 +67,29 @@ export default function DataScreen({ navigate }: { navigate: Navigate }) {
 
       {storageError && <Banner tone="error">{storageError}</Banner>}
 
+      {recovery && (
+        <Banner tone="warn">
+          <strong>Heads up</strong>
+          <p className="small" style={{ marginTop: 4 }}>{recovery.message}</p>
+          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            {recovery.rescuedKey && (
+              <button
+                className="btn btn--sm btn--ghost"
+                onClick={() => {
+                  const rescued = readRescued(recovery.rescuedKey!)
+                  if (!rescued) { flash('That copy is no longer on the device'); return }
+                  downloadFile(`neon-sets-unreadable-${new Date().toISOString().slice(0, 10)}.json`, rescued, 'text/plain')
+                  flash('Saved the unreadable copy')
+                }}
+              >
+                Download it
+              </button>
+            )}
+            <button className="btn btn--sm btn--quiet" onClick={dismissRecovery}>Dismiss</button>
+          </div>
+        </Banner>
+      )}
+
       <div className={`card ${backup.due ? 'card--glow' : ''}`}>
         <div className="card__label">Your data lives on this device</div>
         <p className="small muted">
@@ -80,6 +109,56 @@ export default function DataScreen({ navigate }: { navigate: Navigate }) {
         <p className="hint">
           The summary is plain text: what you lifted, for how many reps, at what RPE — ready to
           paste back into your AI tool so your next plan is built on real numbers.
+        </p>
+      </div>
+
+      <div className="card">
+        <div className="card__label">How safe is it on this device?</div>
+        <div className="stack-sm">
+          <div className="log-line">
+            <span>Survives closing the app and restarting the phone</span>
+            <span style={{ color: 'var(--lime)' }}>Yes</span>
+          </div>
+          <div className="log-line">
+            <span>Protected from being cleared to free up space</span>
+            <span style={{ color: isPersisted ? 'var(--lime)' : 'var(--amber)' }}>
+              {storage.supported ? (isPersisted ? 'Yes' : 'Not yet') : 'Unknown'}
+            </span>
+          </div>
+          <div className="log-line">
+            <span>Installed to the home screen</span>
+            <span style={{ color: standalone ? 'var(--lime)' : 'var(--amber)' }}>
+              {standalone ? 'Yes' : 'No'}
+            </span>
+          </div>
+          {storage.usageBytes !== undefined && (
+            <div className="log-line">
+              <span>Space used</span>
+              <span className="dim">
+                {formatBytes(storage.usageBytes)}
+                {storage.quotaBytes ? ` of ${formatBytes(storage.quotaBytes)}` : ''}
+              </span>
+            </div>
+          )}
+        </div>
+        {!isPersisted && storage.supported && (
+          <button
+            className="btn btn--ghost btn--block btn--sm"
+            onClick={async () => {
+              const granted = await requestPersistence()
+              setPersisted(granted)
+              flash(granted
+                ? 'The browser will now protect your data'
+                : 'The browser said no — installing to the home screen usually changes its mind')
+            }}
+          >
+            Ask the browser to protect it
+          </button>
+        )}
+        <p className="hint">
+          Your training log is written to the device's disk, so it survives restarts, closing
+          the app, and being offline. It is still lost if you delete the app or clear this
+          site's data in browser settings — which is why the backups above matter.
         </p>
       </div>
 
@@ -113,6 +192,21 @@ export default function DataScreen({ navigate }: { navigate: Navigate }) {
           </label>
         </div>
         <p className="hint">Merging keeps what's already here and adds anything missing.</p>
+        {snapshotAvailable && (
+          <button
+            className="btn btn--ghost btn--block btn--sm"
+            onClick={() => {
+              if (!window.confirm('Put back the data as it was before the last restore or wipe?')) return
+              flash(undoRestore() ? 'Previous data put back' : 'Nothing to put back')
+            }}
+          >
+            Undo the last restore
+          </button>
+        )}
+        <p className="hint">
+          Replacing or deleting keeps a copy of what was there first, so a wrong tap is not the
+          end of your training log.
+        </p>
       </div>
 
       <div className="card">

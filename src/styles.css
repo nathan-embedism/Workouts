@@ -72,6 +72,12 @@ html, body {
   font-family: var(--font-body);
   font-size: 16px;
   overscroll-behavior-y: none;
+  /* Kill the double-tap-to-zoom gesture (the paste menu triggers it) while
+     leaving pinch-to-zoom available. */
+  touch-action: manipulation;
+  /* Stop iOS inflating text when the orientation changes. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -88,7 +94,10 @@ p { margin: 0; line-height: 1.5; }
 a { color: var(--cyan); }
 
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; border: none; background: none; touch-action: manipulation; }
+button { cursor: pointer; border: none; background: none; }
+button, input, textarea, select { touch-action: manipulation; }
+/* 16px is the floor for anything focusable, or iOS zooms to it. */
+input, textarea, select { font-size: max(16px, 1em); }
 
 /* ------------------------------------------------------------------ layout */
 .app {
@@ -263,7 +272,14 @@ label.field { display: flex; flex-direction: column; gap: 6px; }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .textarea { min-height: 96px; resize: vertical; line-height: 1.45; }
-.textarea--code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; min-height: 180px; }
+.textarea--code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Never below 16px: iOS zooms the page in to fit a focused control smaller
+     than that, and the JSON paste box is the one people tap into most. */
+  font-size: 16px;
+  line-height: 1.35;
+  min-height: 180px;
+}
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
@@ -486,7 +502,22 @@ label.field { display: flex; flex-direction: column; gap: 6px; }
   font-weight: 700;
   line-height: 0.9;
   font-variant-numeric: tabular-nums;
+  /* It is an <input>: tap the number to type a value straight in. */
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  outline: none;
+  appearance: none;
 }
+.stepper__value:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.stepper__number::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 .stepper__unit {
   font-family: var(--font-ui);
   font-size: 12px;
