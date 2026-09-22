@@ -107,8 +107,10 @@ instead of silently ending your rest.
 
 <img src="docs/screenshots/summary.png" width="230" align="right" alt="End of session summary with sets, duration, volume and average RPE">
 
-Finishing a session gives you the totals, what you did per exercise, and a place
-to note how it went.
+Finishing a session gives you the totals, what you did per exercise, and a
+freeform box to note how it went. Forgot at the time, or thought of something
+later? Open the workout in the **Log** tab and add or edit the note there — set
+notes you typed during the session show up under each set alongside it.
 
 The **Data** tab exports every plan and every logged set as a JSON file, and nags
 you when you're overdue. **Copy progress for my AI tool** produces a plain-text

@@ -34,6 +34,7 @@ interface StoreValue {
   logSet: (log: SetLog) => void
   setStepIndex: (sessionId: string, index: number) => void
   finishSession: (sessionId: string, notes?: string) => void
+  setSessionNotes: (sessionId: string, notes?: string) => void
   abandonSession: (sessionId: string) => void
   updateSettings: (patch: Partial<Settings>) => void
   saveDraft: (draft: Record<string, unknown>) => void
@@ -189,6 +190,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  /** Edit the freeform note on a workout, including long after it finished. */
+  const setSessionNotes = useCallback((sessionId: string, notes?: string) => {
+    setData((prev) => ({
+      ...prev,
+      sessions: prev.sessions.map((s) => (s.id === sessionId ? { ...s, notes } : s)),
+    }))
+  }, [])
+
   const abandonSession = useCallback((sessionId: string) => {
     setData((prev) => ({ ...prev, sessions: prev.sessions.filter((s) => s.id !== sessionId) }))
   }, [])
@@ -261,12 +270,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     snapshotAvailable,
     undoRestore,
     importPlan, appendDays, removePlan, setActivePlan, startSession, logSet, setStepIndex,
-    finishSession, abandonSession, updateSettings, saveDraft, markExported,
+    finishSession, setSessionNotes, abandonSession, updateSettings, saveDraft, markExported,
     replaceAll, mergeBackup,
   }), [
     data, storageError, recovery, dismissRecovery, snapshotAvailable, undoRestore,
     importPlan, appendDays, removePlan, setActivePlan, startSession, logSet,
-    setStepIndex, finishSession, abandonSession, updateSettings, saveDraft, markExported,
+    setStepIndex, finishSession, setSessionNotes, abandonSession, updateSettings, saveDraft,
+    markExported,
     replaceAll, mergeBackup,
   ])
 

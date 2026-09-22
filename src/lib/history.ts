@@ -181,6 +181,8 @@ export function progressSummary(
           if (log.distance !== undefined) bits.push(`${log.distance}${log.distanceUnit ?? ''}`)
           if (log.durationSeconds !== undefined) bits.push(`${Math.round(log.durationSeconds / 60)}m`)
           if (log.rpe !== undefined) bits.push(`@RPE ${log.rpe}`)
+          // Whatever the user typed against the set itself — often the useful part.
+          if (log.notes) bits.push(`(${log.notes})`)
           return bits.join(' ') || 'done'
         })
       lines.push(`  ${name}: ${parts.join(' | ')}`)

@@ -4,13 +4,23 @@ import { useStore } from '../lib/store'
 import { clockTime, relativeDays, roundLoad, shortDate } from '../lib/format'
 import { normaliseName } from '../lib/history'
 import Progress from './Progress'
-import { Banner } from '../components/ui'
+import { Banner, useFlash } from '../components/ui'
 
 export default function History({ navigate }: { navigate: Navigate }) {
-  const { sessions, settings } = useStore()
+  const { sessions, settings, setSessionNotes } = useStore()
+  const flash = useFlash()
   const [openId, setOpenId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'sessions' | 'progress'>('sessions')
+  // The workout whose note is being edited, and the text so far.
+  const [noteEdit, setNoteEdit] = useState<{ id: string; text: string } | null>(null)
+
+  const saveNote = () => {
+    if (!noteEdit) return
+    setSessionNotes(noteEdit.id, noteEdit.text.trim() || undefined)
+    setNoteEdit(null)
+    flash('Note saved')
+  }
 
   const finished = useMemo(
     () => sessions.filter((s) => s.endedAt).sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
@@ -111,22 +121,54 @@ export default function History({ navigate }: { navigate: Navigate }) {
                   {open && (
                     <div className="stack-sm" style={{ marginTop: 6 }}>
                       {session.logs.map((log) => (
-                        <div key={log.stepId} className="log-line">
-                          <span className="grow truncate">{log.exerciseName}</span>
-                          <span className="dim tiny">
-                            {log.skipped ? 'skipped' : [
-                              log.weight !== undefined ? `${log.weight} ${log.units}` : null,
-                              log.reps !== undefined ? `× ${log.reps}` : null,
-                              log.incline !== undefined ? `incl ${log.incline}` : null,
-                              log.level !== undefined ? `L${log.level}` : null,
-                              log.distance !== undefined ? `${log.distance}${log.distanceUnit ?? ''}` : null,
-                              log.durationSeconds !== undefined ? clockTime(log.durationSeconds) : null,
-                              log.rpe !== undefined ? `RPE ${log.rpe}` : null,
-                            ].filter(Boolean).join(' · ')}
-                          </span>
+                        <div key={log.stepId}>
+                          <div className="log-line">
+                            <span className="grow truncate">{log.exerciseName}</span>
+                            <span className="dim tiny">
+                              {log.skipped ? 'skipped' : [
+                                log.weight !== undefined ? `${log.weight} ${log.units}` : null,
+                                log.reps !== undefined ? `× ${log.reps}` : null,
+                                log.incline !== undefined ? `incl ${log.incline}` : null,
+                                log.level !== undefined ? `L${log.level}` : null,
+                                log.distance !== undefined ? `${log.distance}${log.distanceUnit ?? ''}` : null,
+                                log.durationSeconds !== undefined ? clockTime(log.durationSeconds) : null,
+                                log.rpe !== undefined ? `RPE ${log.rpe}` : null,
+                              ].filter(Boolean).join(' · ')}
+                            </span>
+                          </div>
+                          {log.notes && <p className="hint">“{log.notes}”</p>}
                         </div>
                       ))}
-                      {session.notes && <p className="hint">“{session.notes}”</p>}
+
+                      {noteEdit?.id === session.id ? (
+                        <div className="stack-sm">
+                          <span className="field__label">Workout notes</span>
+                          <textarea
+                            className="textarea" rows={3} autoFocus value={noteEdit.text}
+                            placeholder="Felt strong, shoulder fine, gym was packed…"
+                            onChange={(e) => setNoteEdit({ id: session.id, text: e.target.value })}
+                          />
+                          <div className="row" style={{ gap: 8 }}>
+                            <button className="btn btn--primary grow" onClick={saveNote}>Save note</button>
+                            <button className="btn btn--quiet" onClick={() => setNoteEdit(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="stack-sm">
+                          {session.notes && (
+                            <>
+                              <span className="field__label">Workout notes</span>
+                              <p className="hint">“{session.notes}”</p>
+                            </>
+                          )}
+                          <button
+                            className="btn btn--quiet btn--sm"
+                            onClick={() => setNoteEdit({ id: session.id, text: session.notes ?? '' })}
+                          >
+                            {session.notes ? 'Edit note' : '+ Add a note'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

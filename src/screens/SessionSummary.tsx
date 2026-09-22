@@ -99,12 +99,15 @@ export default function SessionSummary({
       </div>
 
       <label className="field">
-        <span className="field__label">How did it go?</span>
+        <span className="field__label">Workout notes</span>
         <textarea
-          className="textarea" rows={2} value={notes}
-          placeholder="Felt strong, shoulder fine, gym was packed…"
+          className="textarea" rows={4} value={notes}
+          placeholder="How did it go? Felt strong, shoulder fine, gym was packed…"
           onChange={(e) => setNotes(e.target.value)}
         />
+        <span className="hint">
+          Saved with the workout — you can read it, and change it, in the Log tab later.
+        </span>
       </label>
 
       <div className="stack">
