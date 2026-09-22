@@ -33,6 +33,8 @@ interface StoreValue {
   startSession: (planId: string, dayId: string, dayName: string, planName: string) => string
   logSet: (log: SetLog) => void
   setStepIndex: (sessionId: string, index: number) => void
+  deferStep: (sessionId: string, stepId: string) => void
+  swapExercise: (sessionId: string, exerciseId: string, name?: string) => void
   finishSession: (sessionId: string, notes?: string) => void
   setSessionNotes: (sessionId: string, notes?: string) => void
   abandonSession: (sessionId: string) => void
@@ -181,6 +183,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  /** Put a set off to the end of the workout — or, if it was already put off, to the new end. */
+  const deferStep = useCallback((sessionId: string, stepId: string) => {
+    setData((prev) => ({
+      ...prev,
+      sessions: prev.sessions.map((s) => (s.id === sessionId
+        ? { ...s, deferredStepIds: [...(s.deferredStepIds ?? []).filter((id) => id !== stepId), stepId] }
+        : s)),
+    }))
+  }, [])
+
+  /** Do something else instead, for the rest of this workout. No name puts the plan's exercise back. */
+  const swapExercise = useCallback((sessionId: string, exerciseId: string, name?: string) => {
+    setData((prev) => ({
+      ...prev,
+      sessions: prev.sessions.map((s) => {
+        if (s.id !== sessionId) return s
+        const swaps = { ...(s.swaps ?? {}) }
+        if (name?.trim()) swaps[exerciseId] = name.trim()
+        else delete swaps[exerciseId]
+        return { ...s, swaps }
+      }),
+    }))
+  }, [])
+
   const finishSession = useCallback((sessionId: string, notes?: string) => {
     setData((prev) => ({
       ...prev,
@@ -270,14 +296,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     snapshotAvailable,
     undoRestore,
     importPlan, appendDays, removePlan, setActivePlan, startSession, logSet, setStepIndex,
-    finishSession, setSessionNotes, abandonSession, updateSettings, saveDraft, markExported,
-    replaceAll, mergeBackup,
+    deferStep, swapExercise, finishSession, setSessionNotes, abandonSession, updateSettings,
+    saveDraft, markExported, replaceAll, mergeBackup,
   }), [
     data, storageError, recovery, dismissRecovery, snapshotAvailable, undoRestore,
     importPlan, appendDays, removePlan, setActivePlan, startSession, logSet,
-    setStepIndex, finishSession, setSessionNotes, abandonSession, updateSettings, saveDraft,
-    markExported,
-    replaceAll, mergeBackup,
+    setStepIndex, deferStep, swapExercise, finishSession, setSessionNotes, abandonSession,
+    updateSettings, saveDraft, markExported, replaceAll, mergeBackup,
   ])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

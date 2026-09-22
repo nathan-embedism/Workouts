@@ -21,6 +21,8 @@ export interface SetStep {
   /** Position of the exercise inside its block, for "2 of 3" in a superset. */
   exerciseIndex: number
   exercisesInBlock: number
+  /** The exercise the plan asked for, when this one was swapped in mid-workout. */
+  swappedFrom?: string
 }
 
 export interface RestStep {
@@ -158,6 +160,61 @@ export function estimateMinutes(day: PlanDay): number {
     return total + (step.set.durationSeconds ?? 45)
   }, 0)
   return Math.max(1, Math.round(seconds / 60))
+}
+
+/**
+ * Substitute exercises the user swapped out mid-workout, keyed by the plan's
+ * exercise id. Sets, reps and rest carry over; the equipment, the cues and the
+ * target load do not, because those described the movement that was replaced —
+ * and 100 kg on the leg press is not 100 kg on anything else.
+ */
+export function withSwaps(steps: Step[], swaps: Record<string, string>): Step[] {
+  if (!swaps || !Object.keys(swaps).length) return steps
+  return steps.map((step) => {
+    if (step.kind !== 'set') return step
+    const name = swaps[step.exercise.id]
+    if (!name || name === step.exercise.name) return step
+    return {
+      ...step,
+      exercise: {
+        ...step.exercise,
+        name,
+        equipment: undefined,
+        cues: undefined,
+        machineSettings: undefined,
+      },
+      set: { ...step.set, targetWeight: undefined, targetWeightPercent: undefined },
+      swappedFrom: step.exercise.name,
+    }
+  })
+}
+
+/**
+ * Move sets the user put off to the end of the workout, in the order they were
+ * put off. A set takes the rest that followed it along with it.
+ */
+export function withDeferred(steps: Step[], deferred: string[]): Step[] {
+  if (!deferred?.length) return steps
+
+  const wanted = new Set(deferred)
+  const moved = new Map<string, Step[]>()
+  const kept: Step[] = []
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i]
+    if (step.kind === 'set' && wanted.has(step.id)) {
+      const group: Step[] = [step]
+      if (steps[i + 1]?.kind === 'rest') group.push(steps[++i])
+      moved.set(step.id, group)
+      continue
+    }
+    kept.push(step)
+  }
+
+  const reordered = [...kept, ...deferred.flatMap((id) => moved.get(id) ?? [])]
+  // Whatever ends up last, nobody needs a rest timer after it.
+  while (reordered.length && reordered[reordered.length - 1].kind === 'rest') reordered.pop()
+  return reordered
 }
 
 export function nextSetStep(steps: Step[], from: number): SetStep | undefined {

@@ -22,7 +22,7 @@ const DISTANCE_STEP: Record<string, number> = { m: 50, km: 0.5, mi: 0.25, cal: 5
 
 export default function SetLogger({
   step, units, weightIncrement, values, onChange, lastTime, todaysLogs,
-  onLog, onSkip, onStartTimer, restSeconds,
+  onLog, onSkip, onStartTimer, onSwap, onDefer, restSeconds,
 }: {
   step: SetStep
   units: Units
@@ -34,6 +34,9 @@ export default function SetLogger({
   onLog: () => void
   onSkip: () => void
   onStartTimer?: () => void
+  onSwap: () => void
+  /** Absent on the last set of the workout, where there is no "later" left. */
+  onDefer?: () => void
   restSeconds: number
 }) {
   const [showNote, setShowNote] = useState(!!values.notes)
@@ -71,6 +74,7 @@ export default function SetLogger({
 
       <div>
         <div className="exercise-name">{step.exercise.name}</div>
+        {step.swappedFrom && <div className="hint" style={{ marginTop: 6 }}>Swapped in for {step.swappedFrom}</div>}
         {step.exercise.equipment && <div className="hint" style={{ marginTop: 6 }}>{step.exercise.equipment}</div>}
       </div>
 
@@ -256,6 +260,14 @@ export default function SetLogger({
         <button className="btn btn--primary btn--block btn--xl" onClick={onLog}>
           {restSeconds > 0 ? `Log set · rest ${durationWords(restSeconds)}` : 'Log set'}
         </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn btn--quiet btn--sm grow" onClick={onSwap}>
+            {step.swappedFrom ? 'Change swap' : 'Swap exercise'}
+          </button>
+          {onDefer && (
+            <button className="btn btn--quiet btn--sm grow" onClick={onDefer}>Save for later</button>
+          )}
+        </div>
         <button className="btn btn--quiet btn--block" onClick={onSkip}>Skip this set</button>
       </div>
     </div>

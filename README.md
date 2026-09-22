@@ -86,6 +86,14 @@ for perceived exertion, and add a note if something felt off.
 Drop sets show each drop's load calculated from the weight you just entered.
 Timed work gets its own full-screen countdown that fills in the duration for you.
 
+The gym rarely cooperates, so every set also offers **Swap exercise** and **Save
+for later**. Swapping asks what you're doing instead — type it, or tap one of
+the movements your plan already uses — and substitutes it for the rest of the
+workout, keeping the sets, reps and rest but dropping a target load that belongs
+to the movement you replaced. Saving for later pushes that set to the end of the
+workout, for when the rack is busy. Both survive closing the app, and the log
+records what you actually did.
+
 <br clear="right">
 
 ### Rest between sets

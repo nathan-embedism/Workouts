@@ -182,6 +182,10 @@ export interface Session {
   logs: SetLog[]
   /** Where the runner left off, so a closed tab can pick the session back up. */
   stepIndex: number
+  /** Sets put off to the end of this workout, in the order they were put off. */
+  deferredStepIds?: string[]
+  /** Exercises swapped mid-workout: the plan's exercise id → what was done instead. */
+  swaps?: Record<string, string>
   notes?: string
 }
 

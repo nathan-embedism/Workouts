@@ -1,22 +1,26 @@
 import { useMemo, useState } from 'react'
 import type { Navigate } from '../App'
-import type { Session, SetLog } from '../types'
+import type { PlanDay, Session, SetLog, WorkoutPlan } from '../types'
 import { useStore } from '../lib/store'
 import { findDay } from '../lib/plan'
-import { buildSteps, nextSetStep, type SetStep, type Step } from '../lib/steps'
-import { lastTimeFor, type LastTime } from '../lib/history'
+import {
+  buildSteps, nextSetStep, withDeferred, withSwaps, type SetStep, type Step,
+} from '../lib/steps'
+import { lastTimeFor, normaliseName, type LastTime } from '../lib/history'
 import { clockTime, durationWords, repsTarget, setTargetLine } from '../lib/format'
 import { useElapsed, useWakeLock, vibrate } from '../lib/hooks'
 import FullscreenTimer from '../components/FullscreenTimer'
 import SetLogger, { type LoggedValues } from '../components/SetLogger'
 import SessionSummary from './SessionSummary'
-import { Banner } from '../components/ui'
+import { Banner, useFlash } from '../components/ui'
 
 export default function Runner({ session, navigate }: { session: Session; navigate: Navigate }) {
   const store = useStore()
-  const { plans, settings, logSet, setStepIndex } = store
+  const { plans, settings, logSet, setStepIndex, deferStep, swapExercise } = store
+  const flash = useFlash()
   const [workTimer, setWorkTimer] = useState(false)
   const [exitSheet, setExitSheet] = useState(false)
+  const [swapSheet, setSwapSheet] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, LoggedValues>>({})
   const elapsed = useElapsed(session.startedAt)
@@ -24,7 +28,11 @@ export default function Runner({ session, navigate }: { session: Session; naviga
 
   const plan = plans.find((p) => p.id === session.planId)?.plan
   const day = plan ? findDay(plan, session.dayId) : undefined
-  const steps = useMemo(() => (day ? buildSteps(day) : []), [day])
+  // The plan's order, then what this workout did to it: swaps first, so a
+  // deferred set keeps whatever it was swapped for.
+  const steps = useMemo(() => (day
+    ? withDeferred(withSwaps(buildSteps(day), session.swaps ?? {}), session.deferredStepIds ?? [])
+    : []), [day, session.swaps, session.deferredStepIds])
 
   const index = Math.min(session.stepIndex, steps.length)
   const step: Step | undefined = steps[index]
@@ -102,6 +110,23 @@ export default function Runner({ session, navigate }: { session: Session; naviga
     logSet(log)
     if (settings.vibrate) vibrate(40)
     goTo(index + 1)
+  }
+
+  /**
+   * Put this set off to the end. It leaves its place in the list, so the index
+   * already points at whatever comes next — no need to move it.
+   */
+  const deferCurrent = (setStep: SetStep) => {
+    deferStep(session.id, setStep.id)
+    setWorkTimer(false)
+    flash('Saved for the end of the workout')
+    window.scrollTo({ top: 0 })
+  }
+
+  const applySwap = (setStep: SetStep, name?: string) => {
+    swapExercise(session.id, setStep.exercise.id, name)
+    setSwapSheet(false)
+    flash(name?.trim() ? `Swapped in ${name.trim()}` : `Back to ${setStep.swappedFrom ?? setStep.exercise.name}`)
   }
 
   const header = (
@@ -183,8 +208,10 @@ export default function Runner({ session, navigate }: { session: Session; naviga
 
   /* -------------------------------------------------------- logging a set */
   const restSeconds = steps[index + 1]?.kind === 'rest' ? (steps[index + 1] as { seconds: number }).seconds : 0
+  // Matched on name as well as id, so a swapped-in movement does not claim the
+  // sets that were done before the swap.
   const todaysLogs = session.logs
-    .filter((l) => l.exerciseId === step.exercise.id)
+    .filter((l) => l.exerciseId === step.exercise.id && l.exerciseName === step.exercise.name)
     .sort((a, b) => a.round - b.round || a.setIndex - b.setIndex)
 
   return (
@@ -203,7 +230,16 @@ export default function Runner({ session, navigate }: { session: Session; naviga
         onLog={() => writeLog(step, values(step), false)}
         onSkip={() => writeLog(step, values(step), true)}
         onStartTimer={step.set.durationSeconds ? () => setWorkTimer(true) : undefined}
+        onSwap={() => setSwapSheet(true)}
+        onDefer={nextSetStep(steps, index + 1) ? () => deferCurrent(step) : undefined}
       />
+      {swapSheet && (
+        <SwapSheet
+          plan={plan} day={day} step={step}
+          onClose={() => setSwapSheet(false)}
+          onChoose={(name) => applySwap(step, name)}
+        />
+      )}
       {exitSheet && <ExitSheet onClose={() => setExitSheet(false)} onFinish={() => setFinishing(true)} navigate={navigate} sessionId={session.id} />}
     </div>
   )
@@ -222,7 +258,9 @@ function initialValues(step: SetStep, session: Session, lastTime?: LastTime): Lo
 
   const set = step.set
   // What the user already did for this exercise today, then what they did last time.
-  const carried = [...session.logs].reverse().find((l) => l.exerciseId === step.exercise.id && !l.skipped)
+  const carried = [...session.logs].reverse().find(
+    (l) => l.exerciseId === step.exercise.id && l.exerciseName === step.exercise.name && !l.skipped,
+  )
   const previous = lastTime?.logs[Math.min(step.setIndex, (lastTime?.logs.length ?? 1) - 1)]
 
   const pick = (
@@ -243,10 +281,8 @@ function initialValues(step: SetStep, session: Session, lastTime?: LastTime): Lo
   }
 }
 
-function ExitSheet({
-  onClose, onFinish, navigate, sessionId,
-}: { onClose: () => void; onFinish: () => void; navigate: Navigate; sessionId: string }) {
-  const { abandonSession } = useStore()
+/** A card that slides up from the bottom edge, dismissed by tapping outside it. */
+function Sheet({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div
       style={{
@@ -257,27 +293,119 @@ function ExitSheet({
     >
       <div
         className="card"
-        style={{ width: '100%', borderRadius: '20px 20px 0 0', paddingBottom: 'calc(var(--safe-bottom) + 16px)' }}
+        style={{
+          width: '100%', borderRadius: '20px 20px 0 0',
+          paddingBottom: 'calc(var(--safe-bottom) + 16px)',
+          maxHeight: '86dvh', overflowY: 'auto',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="card__label">Leaving already?</div>
-        <button className="btn btn--lime btn--block" onClick={onFinish}>Finish and save</button>
-        <button className="btn btn--ghost btn--block" onClick={() => navigate('/')}>
-          Pause — keep it for later
-        </button>
-        <button
-          className="btn btn--danger btn--block"
-          onClick={() => {
-            if (window.confirm('Discard this workout and everything logged in it?')) {
-              abandonSession(sessionId)
-              navigate('/')
-            }
-          }}
-        >
-          Discard workout
-        </button>
-        <button className="btn btn--quiet btn--block" onClick={onClose}>Cancel</button>
+        {children}
       </div>
     </div>
+  )
+}
+
+/**
+ * Machine taken, shoulder complaining, dumbbells missing: do something else for
+ * the rest of the workout, against the same prescription.
+ */
+function SwapSheet({
+  plan, day, step, onClose, onChoose,
+}: {
+  plan: WorkoutPlan
+  day: PlanDay
+  step: SetStep
+  onClose: () => void
+  onChoose: (name?: string) => void
+}) {
+  const [name, setName] = useState('')
+
+  // Other movements of the same kind that the plan already uses — usually where
+  // a sensible substitute comes from, and one tap instead of typing. Today's
+  // first: they were chosen for today's focus, so they are the closest match.
+  const suggestions = useMemo(() => {
+    const seen = new Set([normaliseName(step.exercise.name), normaliseName(step.swappedFrom ?? '')])
+    const names: string[] = []
+    for (const source of [day, ...plan.days.filter((d) => d.id !== day.id)]) {
+      for (const block of source.blocks) {
+        for (const exercise of block.exercises) {
+          const key = normaliseName(exercise.name)
+          if (exercise.modality !== step.exercise.modality || seen.has(key)) continue
+          seen.add(key)
+          names.push(exercise.name)
+        }
+      }
+    }
+    return names.slice(0, 6)
+  }, [plan, day, step])
+
+  return (
+    <Sheet onClose={onClose}>
+      <div className="card__label">Swap exercise</div>
+      <p className="small muted">
+        Instead of {step.exercise.name}, for the rest of this workout. Sets, reps and rest stay
+        as prescribed; the target load doesn't carry over, and the log records what you
+        actually did.
+      </p>
+
+      <input
+        className="input" autoFocus value={name} placeholder="What are you doing instead?"
+        enterKeyHint="done"
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onChoose(name) }}
+      />
+      <button
+        className="btn btn--primary btn--block" disabled={!name.trim()}
+        onClick={() => onChoose(name)}
+      >Use this instead</button>
+
+      {suggestions.length > 0 && (
+        <>
+          <div className="card__label">Elsewhere in your plan</div>
+          <div className="chips">
+            {suggestions.map((suggestion) => (
+              <button key={suggestion} type="button" className="chip" onClick={() => onChoose(suggestion)}>
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {step.swappedFrom && (
+        <button className="btn btn--ghost btn--block" onClick={() => onChoose(undefined)}>
+          Back to {step.swappedFrom}
+        </button>
+      )}
+      <button className="btn btn--quiet btn--block" onClick={onClose}>Cancel</button>
+    </Sheet>
+  )
+}
+
+function ExitSheet({
+  onClose, onFinish, navigate, sessionId,
+}: { onClose: () => void; onFinish: () => void; navigate: Navigate; sessionId: string }) {
+  const { abandonSession } = useStore()
+  return (
+    <Sheet onClose={onClose}>
+      <div className="card__label">Leaving already?</div>
+      <button className="btn btn--lime btn--block" onClick={onFinish}>Finish and save</button>
+      <button className="btn btn--ghost btn--block" onClick={() => navigate('/')}>
+        Pause — keep it for later
+      </button>
+      <button
+        className="btn btn--danger btn--block"
+        onClick={() => {
+          if (window.confirm('Discard this workout and everything logged in it?')) {
+            abandonSession(sessionId)
+            navigate('/')
+          }
+        }}
+      >
+        Discard workout
+      </button>
+      <button className="btn btn--quiet btn--block" onClick={onClose}>Cancel</button>
+    </Sheet>
   )
 }
