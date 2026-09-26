@@ -432,6 +432,37 @@
               ]
             }
           ]
+        },
+        {
+          "kind": "circuit",
+          "name": "Finisher",
+          "timeCapSeconds": 300,
+          "exercises": [
+            {
+              "name": "Push-up",
+              "modality": "bodyweight",
+              "trackingFields": [
+                "reps"
+              ],
+              "sets": [
+                {
+                  "type": "amrap"
+                }
+              ]
+            },
+            {
+              "name": "Plank",
+              "modality": "mobility",
+              "trackingFields": [
+                "duration"
+              ],
+              "sets": [
+                {
+                  "type": "amrap"
+                }
+              ]
+            }
+          ]
         }
       ]
     },

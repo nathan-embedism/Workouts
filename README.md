@@ -86,6 +86,12 @@ for perceived exertion, and add a note if something felt off.
 Drop sets show each drop's load calculated from the weight you just entered.
 Timed work gets its own full-screen countdown that fills in the duration for you.
 
+Timed AMRAPs that alternate exercises (say 10 minutes of push-ups and plank) run
+on one clock. Tap the big **Switch** button each time you change exercise and the
+app logs how long you spent on each stint. At the end you can add a rep count for
+anything countable, like the push-ups, or leave it blank. In the plan these are
+a `circuit` block with `"timeCapSeconds": 600`.
+
 <br clear="right">
 
 ### Rest between sets

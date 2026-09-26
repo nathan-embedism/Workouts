@@ -347,6 +347,15 @@ export function validatePlan(input: unknown): ValidationResult {
           if (blockName) block.name = blockName
           const rounds = num(rawBlock.rounds)
           if (rounds !== undefined) block.rounds = rounds
+          // Models reach for "durationSeconds" on a block when they mean a time cap.
+          const timeCap = num(rawBlock.timeCapSeconds) ?? num(rawBlock.durationSeconds)
+          if (timeCap !== undefined && timeCap > 0) {
+            if (kind === 'single') {
+              warnings.push(`${bWhere} has a time cap but only one exercise — ignoring the cap.`)
+            } else {
+              block.timeCapSeconds = timeCap
+            }
+          }
           const restBetween = num(rawBlock.restBetweenExercisesSeconds)
           if (restBetween !== undefined) block.restBetweenExercisesSeconds = restBetween
           const restAfter = num(rawBlock.restAfterBlockSeconds) ?? defaults.restAfterBlockSeconds

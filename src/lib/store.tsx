@@ -32,6 +32,8 @@ interface StoreValue {
   setActivePlan: (id: string) => void
   startSession: (planId: string, dayId: string, dayName: string, planName: string) => string
   logSet: (log: SetLog) => void
+  /** Replace everything logged under one step, e.g. each stint of an AMRAP. */
+  logStep: (sessionId: string, stepId: string, logs: SetLog[]) => void
   setStepIndex: (sessionId: string, index: number) => void
   finishSession: (sessionId: string, notes?: string) => void
   abandonSession: (sessionId: string) => void
@@ -173,6 +175,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const logStep = useCallback((sessionId: string, stepId: string, entries: SetLog[]) => {
+    setData((prev) => ({
+      ...prev,
+      sessions: prev.sessions.map((session) => {
+        if (session.id !== sessionId) return session
+        const logs = session.logs.filter((l) => l.stepId !== stepId && !l.stepId.startsWith(`${stepId}:`))
+        return { ...session, logs: [...logs, ...entries] }
+      }),
+    }))
+  }, [])
+
   const setStepIndex = useCallback((sessionId: string, index: number) => {
     setData((prev) => ({
       ...prev,
@@ -260,12 +273,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     dismissRecovery,
     snapshotAvailable,
     undoRestore,
-    importPlan, appendDays, removePlan, setActivePlan, startSession, logSet, setStepIndex,
+    importPlan, appendDays, removePlan, setActivePlan, startSession, logSet, logStep, setStepIndex,
     finishSession, abandonSession, updateSettings, saveDraft, markExported,
     replaceAll, mergeBackup,
   }), [
     data, storageError, recovery, dismissRecovery, snapshotAvailable, undoRestore,
-    importPlan, appendDays, removePlan, setActivePlan, startSession, logSet,
+    importPlan, appendDays, removePlan, setActivePlan, startSession, logSet, logStep,
     setStepIndex, finishSession, abandonSession, updateSettings, saveDraft, markExported,
     replaceAll, mergeBackup,
   ])

@@ -92,6 +92,12 @@ export interface Block {
   rounds?: number
   restBetweenExercisesSeconds?: number
   restAfterBlockSeconds?: number
+  /**
+   * Superset/circuit only: an AMRAP against the clock. The exercises are
+   * alternated for this long and the user taps to switch between them, so the
+   * time spent on each is logged. Replaces `rounds`.
+   */
+  timeCapSeconds?: number
   notes?: string
   exercises: Exercise[]
 }

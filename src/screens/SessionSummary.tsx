@@ -4,7 +4,7 @@ import type { Session } from '../types'
 import { useStore } from '../lib/store'
 import { progressSummary } from '../lib/history'
 import { buildFeedbackPrompt } from '../lib/schema'
-import { clockTime, roundLoad } from '../lib/format'
+import { clockTime, durationWords, roundLoad } from '../lib/format'
 import { copyText } from '../lib/hooks'
 import { useFlash } from '../components/ui'
 
@@ -89,7 +89,7 @@ export default function SessionSummary({
                 log.weight !== undefined ? `${log.weight}${settings.units}` : null,
                 log.reps !== undefined ? `×${log.reps}` : null,
                 log.level !== undefined ? `L${log.level}` : null,
-                log.durationSeconds !== undefined ? `${Math.round(log.durationSeconds / 60)}m` : null,
+                log.durationSeconds !== undefined ? durationWords(log.durationSeconds) : null,
                 log.rpe !== undefined ? `@${log.rpe}` : null,
               ].filter(Boolean).join(' ')).join('  ·  ')}
             </div>

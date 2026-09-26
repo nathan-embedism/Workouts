@@ -1,7 +1,7 @@
 import type { Navigate } from '../App'
 import { useStore } from '../lib/store'
 import { findDay } from '../lib/plan'
-import { countSets, estimateMinutes } from '../lib/steps'
+import { amrapCapFor, countSets, estimateMinutes } from '../lib/steps'
 import { durationWords, repsTarget, setTargetLine } from '../lib/format'
 import { lastTimeFor } from '../lib/history'
 import { Banner } from '../components/ui'
@@ -54,17 +54,22 @@ export default function DayPreview({ dayId, navigate }: { dayId: string; navigat
         </Banner>
       )}
 
-      {day.blocks.map((block) => (
+      {day.blocks.map((block) => {
+        const cap = amrapCapFor(block)
+        return (
         <div key={block.id} className="card">
           <div className="row-between">
             <div className="card__label">
-              {block.kind === 'single' ? 'Straight sets' : block.kind === 'circuit' ? 'Circuit' : 'Superset'}
+              {cap ? 'AMRAP' : block.kind === 'single' ? 'Straight sets' : block.kind === 'circuit' ? 'Circuit' : 'Superset'}
               {block.name ? ` · ${block.name}` : ''}
             </div>
-            {block.kind !== 'single' && block.rounds && (
+            {cap ? (
+              <span className="pill pill--accent">{durationWords(cap)} on the clock</span>
+            ) : block.kind !== 'single' && block.rounds && (
               <span className="pill">{block.rounds} rounds</span>
             )}
           </div>
+          {cap && <p className="hint">Alternate these in order and tap to switch. Time on each is logged.</p>}
 
           {block.exercises.map((exercise) => {
             const last = lastTimeFor(sessions, exercise.name, settings.units)
@@ -72,7 +77,7 @@ export default function DayPreview({ dayId, navigate }: { dayId: string; navigat
               <div key={exercise.id} className="stack-sm">
                 <div style={{ fontFamily: 'var(--font-ui)', fontSize: 22, lineHeight: 1.1 }}>{exercise.name}</div>
                 {exercise.equipment && <div className="hint">{exercise.equipment}</div>}
-                {exercise.sets.map((set, i) => (
+                {!cap && exercise.sets.map((set, i) => (
                   <div key={i} className="log-line">
                     <span className="dim tiny" style={{ width: 54, flex: 'none' }}>
                       {set.type === 'warmup' ? 'Warm-up' : `Set ${i + 1}`}
@@ -94,7 +99,8 @@ export default function DayPreview({ dayId, navigate }: { dayId: string; navigat
 
           {block.notes && <p className="hint">{block.notes}</p>}
         </div>
-      ))}
+        )
+      })}
 
       <div className="sticky-actions">
         <button className="btn btn--primary btn--block btn--xl" onClick={begin}>

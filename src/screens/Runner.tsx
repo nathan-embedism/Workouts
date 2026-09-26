@@ -3,18 +3,19 @@ import type { Navigate } from '../App'
 import type { Session, SetLog } from '../types'
 import { useStore } from '../lib/store'
 import { findDay } from '../lib/plan'
-import { buildSteps, nextSetStep, type SetStep, type Step } from '../lib/steps'
+import { buildSteps, nextWorkStep, type AmrapStep, type SetStep, type Step, type WorkStep } from '../lib/steps'
 import { lastTimeFor, type LastTime } from '../lib/history'
 import { clockTime, durationWords, repsTarget, setTargetLine } from '../lib/format'
 import { useElapsed, useWakeLock, vibrate } from '../lib/hooks'
 import FullscreenTimer from '../components/FullscreenTimer'
 import SetLogger, { type LoggedValues } from '../components/SetLogger'
+import AmrapRunner from '../components/AmrapRunner'
 import SessionSummary from './SessionSummary'
 import { Banner } from '../components/ui'
 
 export default function Runner({ session, navigate }: { session: Session; navigate: Navigate }) {
   const store = useStore()
-  const { plans, settings, logSet, setStepIndex } = store
+  const { plans, settings, logSet, logStep, setStepIndex } = store
   const [workTimer, setWorkTimer] = useState(false)
   const [exitSheet, setExitSheet] = useState(false)
   const [finishing, setFinishing] = useState(false)
@@ -28,8 +29,8 @@ export default function Runner({ session, navigate }: { session: Session; naviga
 
   const index = Math.min(session.stepIndex, steps.length)
   const step: Step | undefined = steps[index]
-  const setSteps = steps.filter((s): s is SetStep => s.kind === 'set')
-  const setNumber = steps.slice(0, index).filter((s) => s.kind === 'set').length
+  const setSteps = steps.filter((s): s is WorkStep => s.kind !== 'rest')
+  const setNumber = steps.slice(0, index).filter((s) => s.kind !== 'rest').length
 
   const lastTime: LastTime | undefined = useMemo(() => {
     if (!step || step.kind !== 'set') return undefined
@@ -64,7 +65,7 @@ export default function Runner({ session, navigate }: { session: Session; naviga
   }
 
   const previousSetIndex = () => {
-    for (let i = index - 1; i >= 0; i--) if (steps[i].kind === 'set') return i
+    for (let i = index - 1; i >= 0; i--) if (steps[i].kind !== 'rest') return i
     return 0
   }
 
@@ -127,7 +128,7 @@ export default function Runner({ session, navigate }: { session: Session; naviga
 
   /* ------------------------------------------------------------ rest step */
   if (step?.kind === 'rest') {
-    const upcoming = nextSetStep(steps, index)
+    const upcoming = nextWorkStep(steps, index)
     return (
       <div className="runner">
         {header}
@@ -143,14 +144,60 @@ export default function Runner({ session, navigate }: { session: Session; naviga
             <div className="card card--tight card--flat">
               <div className="card__label">Up next</div>
               <div style={{ fontFamily: 'var(--font-ui)', fontSize: 24, lineHeight: 1.1 }}>
-                {upcoming.exercise.name}
+                {upcoming.kind === 'amrap'
+                  ? upcoming.exercises.map((e) => e.name).join(' + ')
+                  : upcoming.exercise.name}
               </div>
               <div className="hint">
-                {setTargetLine(upcoming.set, settings.units) || repsTarget(upcoming.set) || 'Next set'}
+                {upcoming.kind === 'amrap'
+                  ? `${durationWords(upcoming.seconds)} AMRAP`
+                  : setTargetLine(upcoming.set, settings.units) || repsTarget(upcoming.set) || 'Next set'}
               </div>
             </div>
           )}
         </FullscreenTimer>
+        {exitSheet && <ExitSheet onClose={() => setExitSheet(false)} onFinish={() => setFinishing(true)} navigate={navigate} sessionId={session.id} />}
+      </div>
+    )
+  }
+
+  const restSeconds = steps[index + 1]?.kind === 'rest' ? (steps[index + 1] as { seconds: number }).seconds : 0
+
+  /* ------------------------------------------------------ timed AMRAP */
+  if (step?.kind === 'amrap') {
+    const skipAll = (amrap: AmrapStep) => {
+      logStep(session.id, amrap.id, amrap.exercises.map((exercise, i) => ({
+        sessionId: session.id,
+        stepId: `${amrap.id}:skip${i}`,
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        blockId: amrap.blockId,
+        setIndex: 0,
+        round: 0,
+        setType: 'amrap',
+        units: settings.units,
+        at: new Date().toISOString(),
+        skipped: true,
+      })))
+      goTo(index + 1)
+    }
+    return (
+      <div className="runner">
+        {header}
+        <AmrapRunner
+          key={step.id}
+          step={step}
+          sessionId={session.id}
+          units={settings.units}
+          weightIncrement={settings.weightIncrement}
+          restSeconds={restSeconds}
+          onLog={(logs) => {
+            logStep(session.id, step.id, logs)
+            if (settings.vibrate) vibrate(40)
+            goTo(index + 1)
+          }}
+          onSkip={() => skipAll(step)}
+        />
         {exitSheet && <ExitSheet onClose={() => setExitSheet(false)} onFinish={() => setFinishing(true)} navigate={navigate} sessionId={session.id} />}
       </div>
     )
@@ -182,7 +229,6 @@ export default function Runner({ session, navigate }: { session: Session; naviga
   }
 
   /* -------------------------------------------------------- logging a set */
-  const restSeconds = steps[index + 1]?.kind === 'rest' ? (steps[index + 1] as { seconds: number }).seconds : 0
   const todaysLogs = session.logs
     .filter((l) => l.exerciseId === step.exercise.id)
     .sort((a, b) => a.round - b.round || a.setIndex - b.setIndex)
