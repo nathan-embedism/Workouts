@@ -1,7 +1,10 @@
 import type { Block, Exercise, PlanDay, TrackingField, WorkoutSet } from '../types'
 
-/** One thing the runner puts on screen: either a set to perform or a rest timer. */
-export type Step = SetStep | RestStep
+/** One thing the runner puts on screen: a set, a timed AMRAP, or a rest timer. */
+export type Step = SetStep | AmrapStep | RestStep
+
+/** Anything the user performs, as opposed to rests. */
+export type WorkStep = SetStep | AmrapStep
 
 export interface SetStep {
   id: string
@@ -21,6 +24,22 @@ export interface SetStep {
   /** Position of the exercise inside its block, for "2 of 3" in a superset. */
   exerciseIndex: number
   exercisesInBlock: number
+}
+
+/**
+ * A time-capped AMRAP: the block's exercises alternated against one clock,
+ * with the user tapping to switch so each stint is timed. Logged as one
+ * entry per stint.
+ */
+export interface AmrapStep {
+  id: string
+  kind: 'amrap'
+  blockId: string
+  blockKind: Block['kind']
+  blockName?: string
+  blockNotes?: string
+  exercises: Exercise[]
+  seconds: number
 }
 
 export interface RestStep {
@@ -52,6 +71,27 @@ export function trackingFieldsFor(exercise: Exercise, set: WorkoutSet): Tracking
   if (set.targetWeight !== undefined || set.targetWeightPercent !== undefined) fields.add('weight')
   if (set.reps !== undefined || set.repRange !== undefined) fields.add('reps')
   return [...fields]
+}
+
+/**
+ * The time cap if this block is an AMRAP against the clock. Plans written
+ * before `timeCapSeconds` existed often said it as a circuit whose every set is
+ * an AMRAP with a duration, so that reads as one too.
+ */
+export function amrapCapFor(block: Block): number | undefined {
+  if (block.kind === 'single' || block.exercises.length < 2) return undefined
+  if (block.timeCapSeconds) return block.timeCapSeconds
+  if (block.rounds && block.rounds > 1) return undefined
+  const sets = block.exercises.flatMap((e) => e.sets)
+  if (!sets.length || !sets.every((s) => s.type === 'amrap')) return undefined
+  const durations = sets.map((s) => s.durationSeconds).filter((d): d is number => !!d)
+  return durations.length === sets.length ? Math.max(...durations) : undefined
+}
+
+/** Reps are worth asking for: the exercise is logged by count, not by time. */
+export function isCountable(exercise: Exercise): boolean {
+  const set = exercise.sets[0] ?? { type: 'amrap' }
+  return trackingFieldsFor(exercise, set).includes('reps')
 }
 
 function restAfter(set: WorkoutSet, fallback?: number): number {
@@ -97,6 +137,25 @@ export function buildSteps(day: PlanDay): Step[] {
           })
         }
       })
+      return
+    }
+
+    const cap = amrapCapFor(block)
+    if (cap) {
+      steps.push({
+        id: `${block.id}:amrap`,
+        kind: 'amrap',
+        blockId: block.id,
+        blockKind: block.kind,
+        blockName: block.name,
+        blockNotes: block.notes,
+        exercises: block.exercises,
+        seconds: cap,
+      })
+      const seconds = block.restAfterBlockSeconds ?? 0
+      if (seconds > 0) {
+        steps.push({ id: `${block.id}:amrap:rest`, kind: 'rest', seconds, label: 'Rest', blockId: block.id })
+      }
       return
     }
 
@@ -147,23 +206,23 @@ export function buildSteps(day: PlanDay): Step[] {
 }
 
 export function countSets(day: PlanDay): number {
-  return buildSteps(day).filter((s) => s.kind === 'set').length
+  return buildSteps(day).filter((s) => s.kind !== 'rest').length
 }
 
 export function estimateMinutes(day: PlanDay): number {
   if (day.estimatedMinutes) return day.estimatedMinutes
   const steps = buildSteps(day)
   const seconds = steps.reduce((total, step) => {
-    if (step.kind === 'rest') return total + step.seconds
+    if (step.kind === 'rest' || step.kind === 'amrap') return total + step.seconds
     return total + (step.set.durationSeconds ?? 45)
   }, 0)
   return Math.max(1, Math.round(seconds / 60))
 }
 
-export function nextSetStep(steps: Step[], from: number): SetStep | undefined {
+export function nextWorkStep(steps: Step[], from: number): WorkStep | undefined {
   for (let i = from; i < steps.length; i++) {
     const step = steps[i]
-    if (step.kind === 'set') return step
+    if (step.kind !== 'rest') return step
   }
   return undefined
 }

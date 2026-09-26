@@ -55,6 +55,7 @@ code fence. Numbers are numbers, not strings. No trailing commas, no comments.
           "kind": "single" | "superset" | "circuit",
           "name": "string, optional — e.g. 'Finisher'",
           "rounds": 3,                          // superset/circuit only
+          "timeCapSeconds": 600,                // superset/circuit only, optional — see rule 8
           "restBetweenExercisesSeconds": 15,    // superset/circuit only, optional
           "restAfterBlockSeconds": 120,         // optional
           "exercises": [
@@ -129,7 +130,13 @@ RULES
    guidance in "notes" — the app shows the user what they lifted last time.
 7. If the plan is long, it is fine to send the days in batches: reply with a
    complete JSON object containing the first few days, and the app can add
-   later days to the same plan. Never send a partial or truncated object.`
+   later days to the same plan. Never send a partial or truncated object.
+8. A timed AMRAP that alternates exercises ("10 minutes, as many rounds as
+   possible of push-ups and plank") is a "circuit" block with
+   "timeCapSeconds": 600 and no "rounds". Give each exercise ONE set of
+   "type": "amrap", with "reps" if there is a rep target per round and
+   "durationSeconds" if there is a hold time per round. The app times each
+   exercise as the user switches between them.`
 
 export interface BuilderForm {
   goal: string

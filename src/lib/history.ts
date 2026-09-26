@@ -1,5 +1,5 @@
 import type { Session, SetLog, Settings, Units } from '../types'
-import { convertWeight, formatLoad, relativeDays, roundLoad } from './format'
+import { convertWeight, durationWords, formatLoad, relativeDays, roundLoad } from './format'
 
 export function normaliseName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -53,7 +53,7 @@ export function lastTimeFor(
       const bits: string[] = []
       if (log.weight !== undefined) bits.push(String(roundLoad(convertWeight(log.weight, log.units, units))))
       if (log.reps !== undefined) bits.push(`× ${log.reps}`)
-      if (!bits.length && log.durationSeconds !== undefined) bits.push(`${Math.round(log.durationSeconds / 60)}m`)
+      if (!bits.length && log.durationSeconds !== undefined) bits.push(durationWords(log.durationSeconds))
       if (!bits.length && log.distance !== undefined) bits.push(`${log.distance}${log.distanceUnit ?? ''}`)
       if (!bits.length && log.level !== undefined) bits.push(`L${log.level}`)
       return bits.join(' ')
